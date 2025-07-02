@@ -131,13 +131,15 @@ def make_bindings(name, types, arg_names):
         parm = f"PT_REGS_PARM{idx}(ctx)"
         # 포인터 타입 처리
         if '*' in typ:
-            base = typ.replace('*', '').strip()
-            # 기본 타입 포인터는 값만 읽어옴
-            if base in ['int', 'long', 'size_t', '__u32', '__u64', 'pid_t', 'uid_t', 'gid_t']:
+            # MODIFIED: struct 포인터와 문자열 포인터를 구분하여 처리
+            if 'struct' in typ:
+                # struct 포인터는 bpf_probe_read_user로 전체 구조체 복사
                 lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
-            # 문자열이나 구조체 포인터는 전체를 복사
-            else:
+            elif 'char' in typ:
+                # 문자열 포인터는 bpf_probe_read_user_str로 복사
                 lines.append(f"    bpf_probe_read_user_str(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
+            else: # 기타 기본 타입 포인터 (int*, long* 등)
+                lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
         # 일반 타입 처리
         else:
             lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
@@ -366,9 +368,16 @@ def generate_common_event(df):
         
         fields = []
         for typ, var in zip(types, arg_names):
-            # 포인터 타입은 고정 크기 배열로 처리 (주로 문자열)
+            # MODIFIED: struct 포인터와 문자열 포인터를 구분하여 처리
             if '*' in typ:
-                fields.append(f"    char {var}[MAX_STR_LEN];")
+                if 'struct' in typ:
+                    # struct 포인터는 실제 struct 타입으로 필드 선언
+                    # 예: "struct stat*" -> "struct stat"
+                    struct_type = typ.replace('*', '').strip()
+                    fields.append(f"    {struct_type} {var};")
+                else:
+                    # 그 외 포인터는 고정 크기 배열로 처리 (주로 문자열)
+                    fields.append(f"    char {var}[MAX_STR_LEN];")
             else:
                 # 커널 타입으로 변환
                 ktyp = {{
