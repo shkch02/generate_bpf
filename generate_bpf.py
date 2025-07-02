@@ -118,8 +118,9 @@ def get_syscall_info(row, syscall_name):
     arg_names = get_proto(syscall_name)
     # 인자 이름의 개수가 타입 개수와 다를 경우, 기본값으로 대체
     if len(arg_names) != len(types):
+        # IMPROVEMENT: More informative log message
+        print(f"[Warning] Failed to get arg names for \"{syscall_name}\" from man page. Using default names (arg0, arg1, ...).")
         arg_names = [f"arg{i}" for i in range(len(types))]
-        print("get_proto 실패, 기본인자사용됨", syscall_name)  # man 페이지에서 인자 이름을 가져오지 못한 경우 어떤 시스템콜이 실패하여 기본 인자 형태로 작성됐는지 로그 남김
 
     return types, arg_names
 
@@ -216,6 +217,13 @@ void sig_handler(int sig) {{
     running = false;
 }}
 
+// IMPROVEMENT: Kafka delivery report callback
+static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
+    if (rkmessage->err) {
+        fprintf(stderr, "%% Message delivery failed: %%s\n", rd_kafka_err2str(rkmessage->err));
+    }
+}}
+
 static void kafka_init() {{
     char errstr[512];
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
@@ -224,6 +232,8 @@ static void kafka_init() {{
         fprintf(stderr, "%% %%s\n", errstr);
         exit(1);
     }}
+    // Set delivery report callback
+    rd_kafka_conf_set_dr_msg_cb(conf, dr_msg_cb);
 
     rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
     if (!rk) {{
@@ -234,18 +244,38 @@ static void kafka_init() {{
 }}
 
 static void kafka_send(const char* buffer, size_t len) {{
+    if (!buffer || len == 0) return;
+    // RD_KAFKA_MSG_F_COPY makes a copy of the payload.
     rd_kafka_produce(rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, (void*)buffer, len, NULL, 0, NULL);
+    // Poll for delivery reports (and other events)
     rd_kafka_poll(rk, 0);
 }}
 
+// IMPROVEMENT: Robust JSON serialization for each event type
+static void serialize_and_send(const struct event_t *e) {{
+    char *buf = NULL;
+    size_t size = 0;
+    FILE *f = open_memstream(&buf, &size);
+    if (!f) return;
+
+    fprintf(f, "{{\"type\":\"%%s\",\"pid\":%%u,\"ts\":%%llu", event_type_str[e->type], e->pid, e->ts_ns);
+
+    // Event-specific data
+    switch (e->type) {{
+{event_cases}
+    default:
+        break;
+    }}
+
+    fprintf(f, "}}");
+    fclose(f);
+
+    kafka_send(buf, size);
+    free(buf);
+}}
+
 static int on_event(void *ctx, void *data, size_t size) {{
-    const struct event_t *e = data;
-    char buf[1024]; // Increased buffer size
-    // This part should be replaced with a proper JSON library for robustness
-    int len = snprintf(buf, sizeof(buf),
-        "{{\"type\":\"%%s\",\"pid\":%%u,\"ts\":%%llu}}",
-        event_type_str[e->type], e->pid, e->ts_ns);
-    kafka_send(buf, len);
+    serialize_and_send((const struct event_t *)data);
     return 0;
 }}
 
@@ -265,55 +295,85 @@ int main() {{
         goto cleanup;
     }}
 
-    printf("Monitoring syscalls... Press Ctrl+C to exit.\n");
+    printf("Monitoring syscalls... Press Ctrl+C to exit.\n\n");
     while (running) {{
         if (ring_buffer__poll(rb, 100) < 0) {{
             fprintf(stderr, "Error polling ring buffer\n");
             break;
         }}
+        // Poll Kafka regularly to serve delivery reports and other callbacks.
+        rd_kafka_poll(rk, 0);
     }}
 
 cleanup:
     ring_buffer__free(rb);
     {destroys}
-    rd_kafka_topic_destroy(rkt);
+    fprintf(stderr, "\nFlushing final Kafka messages...\n");
     rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
+    rd_kafka_topic_destroy(rkt);
     rd_kafka_destroy(rk);
     printf("Cleaned up resources.\n");
     return 0;
 }}
 """)
 
-def generate_loader(targets):
+def generate_loader(targets, df):
     """ 로더 C 코드(monitor_loader.c)를 생성 """
-    includes, skeletons, attaches, destroys = [], [], [], []
+    includes, skeletons, attaches, destroys, event_cases = [], [], [], [], []
+    
+    # Generate serialization cases for each syscall
+    unique_bases = df['syscall name'].unique()
+    for base in unique_bases:
+        case_str = f"        case EVT_{base.upper()}:\n"
+        
+        row = df[df['syscall name'] == base].iloc[0]
+        types, arg_names = get_syscall_info(row, base)
+
+        for typ, var in zip(types, arg_names):
+            # IMPROVEMENT: Correctly format different types for JSON
+            if '*' in typ:
+                if 'struct' in typ:
+                    # For structs, we can't easily serialize to JSON without more info.
+                    # We'll just indicate its presence.
+                    case_str += f'            fprintf(f, ",\"{var}\":\"<struct>\"");\n'
+                else: # char*
+                    case_str += f'            fprintf(f, ",\"{var}\":\"%%s\"", e->data.{base}.{var});\n'
+            elif typ in ['long', 'ssize_t', 'off_t', 'loff_t', 'time_t']:
+                case_str += f'            fprintf(f, ",\"{var}\":%%lld", (long long)e->data.{base}.{var});\n'
+            elif typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']:
+                case_str += f'            fprintf(f, ",\"{var}\":%%llu", (unsigned long long)e->data.{base}.{var});\n'
+            else: # int, pid_t, uid_t, etc.
+                case_str += f'            fprintf(f, ",\"{var}\":%%d", e->data.{base}.{var});\n'
+        case_str += "            break;"
+        event_cases.append(case_str)
+
     for alias in targets:
         includes.append(f'#include "bpf/{alias}_monitor.skel.h"')
-        skeletons.append(f"    struct {alias}_monitor_bpf *{alias}_skel;")
-        # BUGFIX: !skel 체크, 에러 메시지 추가
+        skeletons.append(f"    struct {alias}_monitor_bpf *{alias}_skel = NULL;")
         attaches.append(textwrap.dedent(f"""
     {alias}_skel = {alias}_monitor_bpf__open_and_load();
     if (!{alias}_skel) {{
         fprintf(stderr, "Failed to open and load {alias} skeleton\n");
-        return 1;
+        goto cleanup;
     }}
     if ({alias}_monitor_bpf__attach({alias}_skel) != 0) {{
         fprintf(stderr, "Failed to attach {alias} skeleton\n");
-        return 1;
+        goto cleanup;
     }}"""))
-        # BUGFIX: destroy 호출 문법 오류 수정
-        destroys.append(f"    {alias}_monitor_bpf__destroy({alias}_skel);")
+        destroys.append(f"    if ({alias}_skel) {alias}_monitor_bpf__destroy({alias}_skel);")
 
     loader = LOADER_TEMPLATE.format(
         includes='\n'.join(includes),
         skeletons='\n'.join(skeletons),
         attaches='\n'.join(attaches),
         destroys='\n'.join(destroys),
-        first=targets[0]
+        first=targets[0],
+        event_cases='\n'.join(event_cases)
     )
     with open(os.path.join(OUT_DIR, 'monitor_loader.c'), 'w') as f:
         f.write(loader)
     print("Generated monitor_loader.c")
+
 
 # --- common_event.h 생성 ---
 def generate_common_event(df):
@@ -322,8 +382,9 @@ def generate_common_event(df):
     #pragma once
     #include <linux/types.h>
 
-    // Max string argument size
-    #define MAX_STR_LEN 256
+    // IMPROVEMENT: Increased max string length for paths, etc.
+    // This is a hard limit; longer strings will be truncated.
+    #define MAX_STR_LEN 1024
 
     enum event_type {{
     {enum_entries}
@@ -355,7 +416,6 @@ def generate_common_event(df):
 
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
     
-    # Use unique base syscall names
     unique_bases = df['syscall name'].unique()
 
     for base in unique_bases:
@@ -368,23 +428,25 @@ def generate_common_event(df):
         
         fields = []
         for typ, var in zip(types, arg_names):
-            # MODIFIED: struct 포인터와 문자열 포인터를 구분하여 처리
             if '*' in typ:
                 if 'struct' in typ:
-                    # struct 포인터는 실제 struct 타입으로 필드 선언
-                    # 예: "struct stat*" -> "struct stat"
                     struct_type = typ.replace('*', '').strip()
                     fields.append(f"    {struct_type} {var};")
                 else:
-                    # 그 외 포인터는 고정 크기 배열로 처리 (주로 문자열)
                     fields.append(f"    char {var}[MAX_STR_LEN];")
             else:
-                # 커널 타입으로 변환
+                # IMPROVEMENT: Expanded mapping for kernel types
                 ktyp = {{
-                    'int': '__s32', 'unsigned int': '__u32', 'pid_t': '__u32',
-                    'long': '__s64', 'unsigned long': '__u64', 'size_t': '__u64',
-                    'umode_t': '__u32', 'loff_t': '__s64'
-                }}.get(typ, typ)
+                    'int': '__s32', 'unsigned int': '__u32',
+                    'long': '__s64', 'unsigned long': '__u64',
+                    'size_t': '__u64', 'ssize_t': '__s64',
+                    'pid_t': '__s32', 'uid_t': '__u32', 'gid_t': '__u32',
+                    'mode_t': '__u32', 'umode_t': '__u16',
+                    'off_t': '__s64', 'loff_t': '__s64',
+                    'dev_t': '__u64', 'ino_t': '__u64',
+                    'time_t': '__s64', 'clockid_t': '__s32',
+                    'key_t': '__s32', 'qid_t': '__u32',
+                }}.get(typ, typ) # Default to itself if not in map
                 fields.append(f"    {ktyp} {var};")
         
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
@@ -402,6 +464,7 @@ def generate_common_event(df):
         f.write(content)
     print(f"Generated {EVENT_HDR}")
 
+
 # --- main ---
 def main():
     """ 스크립트 메인 실행 함수 """
@@ -417,7 +480,7 @@ def main():
     
     # 3. Makefile 및 로더 생성
     generate_makefile(targets);
-    generate_loader(targets);
+    generate_loader(targets, df);
     
     print("\nGeneration complete. Run 'make' to build.")
 
