@@ -40,37 +40,48 @@ BPF_TEMPLATE = textwrap.dedent("""
 #include "common_event.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
-
- static __attribute__((always_inline)) bool starts_with(const char *s, const char *prefix, __u32 n) {{
-      for ( __u32 i = 0; i < n; i++) {{
-          if (s[i] != prefix[i]) return false;
-          if (s[i] == 0)       return false;
-      }}
-      return true;
-  }}
-                               
+                    
 
 SEC("kprobe/__x64_sys_{name}")
 int trace_{name}(struct pt_regs *ctx) {{
     char comm[16];
     bpf_get_current_comm(&comm, sizeof(comm));
 
-    // 컨테이너 런타임(runc, conmon 등)이 아니면 추적하지 않음
-  if (!starts_with(comm, "runc", 4) &&
-        !starts_with(comm, "conmon", 6) &&
-        !starts_with(comm, "containerd-shim", 15) &&
-        !starts_with(comm, "docker", 6)) {{
-        return 0;
-    }}
+    // 컨테이너 런타임(runc, conmon, containerd-shim, docker)이 아니면 추적 중단
+    bool is_container = false;
 
-    struct event_t *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
-    if (!e) {{
+    // "runc"
+    if (comm[0]=='r' && comm[1]=='u' && comm[2]=='n' && comm[3]=='c')
+        is_container = true;
+
+    // "conmon"
+    if (comm[0]=='c' && comm[1]=='o' && comm[2]=='n' && comm[3]=='m'
+        && comm[4]=='o' && comm[5]=='n')
+        is_container = true;
+
+    // "containerd-shim"
+    if (comm[0]=='c' && comm[1]=='o' && comm[2]=='n' && comm[3]=='t'
+        && comm[4]=='a' && comm[5]=='i' && comm[6]=='n' && comm[7]=='e'
+        && comm[8]=='r' && comm[9]=='d' && comm[10]=='-' && comm[11]=='s'
+        && comm[12]=='h' && comm[13]=='i' && comm[14]=='m')
+        is_container = true;
+
+    // "docker"
+    if (comm[0]=='d' && comm[1]=='o' && comm[2]=='c'
+        && comm[3]=='k' && comm[4]=='e' && comm[5]=='r')
+        is_container = true;
+
+    if (!is_container)
         return 0;
-    }}
+
+    /* 이하 eBPF 이벤트 생성 코드 계속… */
+    struct event_t *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
+    if (!e)
+        return 0;
     e->pid   = bpf_get_current_pid_tgid() >> 32;
     e->type  = EVT_{NAME};
     e->ts_ns = bpf_ktime_get_ns();
-{bindings}
+    {bindings}
     bpf_ringbuf_submit(e, 0);
     return 0;
 }}
@@ -297,6 +308,10 @@ LOADER_TEMPLATE = textwrap.dedent("""
 static volatile bool running = true;
 static rd_kafka_t *rk;
 static rd_kafka_topic_t *rkt;
+static const char *event_type_str[] = {{
+{enum_strings}
+    }};
+                                           
 
 void sig_handler(int sig) {{
     running = false;
@@ -404,11 +419,13 @@ cleanup:
 
 def generate_loader(targets, df):
     """ 로더 C 코드(monitor_loader.c)를 생성 """
-    includes, skeletons, attaches, destroys, event_cases = [], [], [], [], []
+    includes, skeletons, attaches, destroys, event_cases,enum_strings = [], [], [], [], [],[]
     
     # Generate serialization cases for each syscall
     unique_bases = df['syscall name'].unique()
     for base in unique_bases:
+        upper_base = base.upper()
+        enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
         case_str = f"        case EVT_{base.upper()}:\n"
         
         row = df[df['syscall name'] == base].iloc[0]
@@ -453,7 +470,8 @@ def generate_loader(targets, df):
         attaches='\n'.join(attaches),
         destroys='\n'.join(destroys),
         first=targets[0],
-        event_cases='\n'.join(event_cases)
+        event_cases='\n'.join(event_cases),
+        enum_strings='\n'.join(enum_strings)
     )
     with open(os.path.join(OUT_DIR, 'monitor_loader.c'), 'w') as f:
         f.write(loader)
@@ -467,7 +485,8 @@ def generate_common_event(df):
     #pragma once
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
+#include <bpf/bpf_tracing.h>                      
+                    
                              
     // IMPROVEMENT: Increased max string length for paths, etc.
     // This is a hard limit; longer strings will be truncated.
@@ -478,11 +497,7 @@ def generate_common_event(df):
         EVT_MAX,
     }};
 
-    // For converting enum to string in user-space
-    static const char *event_type_str[] = {{
-    {enum_strings}
-    }};
-
+    
     {struct_definitions}
 
     struct event_t {{
