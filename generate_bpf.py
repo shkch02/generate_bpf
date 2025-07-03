@@ -272,7 +272,7 @@ TARGETS := {targets}
 OBJECTS := $(addsuffix _monitor.bpf.o, $(TARGETS))
 SKELETONS := $(addsuffix _monitor.skel.h, $(TARGETS))
 
-all: $(OBJECTS) $(SKELETONS)
+all: $(OBJECTS) $(SKELETONS) monitor_loader
                           
 # 패턴 규칙: _name_monitor.bpf.c -> _name_monitor.bpf.o
 %_monitor.bpf.o: bpf/%_monitor.bpf.c include/common_event.h
@@ -281,6 +281,13 @@ all: $(OBJECTS) $(SKELETONS)
 # 패턴 규칙: .bpf.o -> .skel.h
 %_monitor.skel.h: %_monitor.bpf.o
 	$(BPFTOOL) gen skeleton $< > $@
+
+monitor_loader: monitor_loader.c
+    gcc -o $@ $< \
+    -Iinclude \
+    -I$(LLVM_SYSROOT)/include \
+    -I$(KERNEL_SRCDIR)/tools/lib/bpf/include \
+    -lbpf -lrdkafka -lpthread
 
 clean:
 	rm -f *.bpf.o *.skel.h monitor_loader
