@@ -1,196 +1,112 @@
+hkch@homesever:~/2025-1/autoeBPF$ make
 clang -O2 -g -Wall -Werror -target bpf -nostdinc -isystem /usr/lib/llvm-14/lib/clang/14.0.0/../../include -isystem /usr/lib/llvm-14/lib/clang/14.0.0/../../../lib/clang/*/include -isystem /usr/include -isystem /usr/src/linux-headers-5.15.0-142-generic/include/uapi  -Iinclude -I. -I/usr/src/linux-headers-5.15.0-142-generic/tools/lib/bpf/include -c bpf/_llseek_monitor.bpf.c -o _llseek_monitor.bpf.o
 In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:5:
-In file included from /usr/include/linux/types.h:9:
-/usr/include/linux/posix_types.h:27:3: error: typedef redefinition with different types ('struct __kernel_fd_set' vs 'struct __kernel_fd_set')
-} __kernel_fd_set;
-  ^
-include/vmlinux.h:50434:3: note: previous definition is here
-} __kernel_fd_set;
-  ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:5:
-In file included from /usr/include/linux/types.h:9:
-In file included from /usr/include/linux/posix_types.h:36:
-In file included from /usr/include/asm/posix_types.h:7:
-In file included from /usr/include/asm/posix_types_64.h:18:
-/usr/include/asm-generic/posix_types.h:68:22: error: typedef redefinition with different types ('unsigned int' vs '__kernel_ulong_t' (aka 'unsigned long'))
-typedef unsigned int    __kernel_size_t;
-                        ^
-include/vmlinux.h:51:26: note: previous definition is here
-typedef __kernel_ulong_t __kernel_size_t;
+include/common_event.h:865:18: error: field has incomplete type 'struct timex'
+    struct timex buf;
+                 ^
+include/common_event.h:865:12: note: forward declaration of 'struct timex'
+    struct timex buf;
+           ^
+include/common_event.h:893:30: error: field has incomplete type 'struct __user_cap_header'
+    struct __user_cap_header hdrp;
+                             ^
+include/common_event.h:893:12: note: forward declaration of 'struct __user_cap_header'
+    struct __user_cap_header hdrp;
+           ^
+include/common_event.h:894:28: error: field has incomplete type 'struct __user_cap_data'
+    struct __user_cap_data datap;
+                           ^
+include/common_event.h:894:12: note: forward declaration of 'struct __user_cap_data'
+    struct __user_cap_data datap;
+           ^
+include/common_event.h:899:30: error: field has incomplete type 'struct __user_cap_header'
+    struct __user_cap_header hdrp;
+                             ^
+include/common_event.h:893:12: note: forward declaration of 'struct __user_cap_header'
+    struct __user_cap_header hdrp;
+           ^
+include/common_event.h:934:18: error: field has incomplete type 'struct timex'
+    struct timex buf;
+                 ^
+include/common_event.h:865:12: note: forward declaration of 'struct timex'
+    struct timex buf;
+           ^
+include/common_event.h:940:21: error: field has incomplete type 'struct timespec'
+    struct timespec res;
+                    ^
+include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+    struct timespec res;
+           ^
+include/common_event.h:946:21: error: field has incomplete type 'struct timespec'
+    struct timespec tp;
+                    ^
+include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+    struct timespec res;
+           ^
+include/common_event.h:953:27: error: field has incomplete type 'const struct timespec'
+    const struct timespec request;
+                          ^
+include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+    struct timespec res;
+           ^
+include/common_event.h:954:21: error: field has incomplete type 'struct timespec'
+    struct timespec remain;
+                    ^
+include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+    struct timespec res;
+           ^
+include/common_event.h:960:27: error: field has incomplete type 'const struct timespec'
+    const struct timespec tp;
+                          ^
+include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+    struct timespec res;
+           ^
+include/common_event.h:965:15: error: expected ')'
+    __s32 (*fn;
+              ^
+include/common_event.h:965:11: note: to match this '('
+    __s32 (*fn;
+          ^
+include/common_event.h:1196:10: error: expected member name or ';' after declaration specifiers
+    char /[MAX_STR_LEN];
+    ~~~~ ^
+include/common_event.h:1196:9: error: expected ';' at end of declaration list
+    char /[MAX_STR_LEN];
+        ^
+        ;
+include/common_event.h:1325:27: error: field has incomplete type 'const struct timespec'
+    const struct timespec timeout;
+                          ^
+include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+    struct timespec res;
+           ^
+include/common_event.h:1334:26: error: field has incomplete type 'const struct timeval'
+    const struct timeval times2;
                          ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:5:
-In file included from /usr/include/linux/types.h:9:
-In file included from /usr/include/linux/posix_types.h:36:
-In file included from /usr/include/asm/posix_types.h:7:
-In file included from /usr/include/asm/posix_types_64.h:18:
-/usr/include/asm-generic/posix_types.h:69:14: error: typedef redefinition with different types ('int' vs '__kernel_long_t' (aka 'long'))
-typedef int             __kernel_ssize_t;
-                        ^
-include/vmlinux.h:53:25: note: previous definition is here
-typedef __kernel_long_t __kernel_ssize_t;
-                        ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:5:
-In file included from /usr/include/linux/types.h:9:
-In file included from /usr/include/linux/posix_types.h:36:
-In file included from /usr/include/asm/posix_types.h:7:
-In file included from /usr/include/asm/posix_types_64.h:18:
-/usr/include/asm-generic/posix_types.h:70:14: error: typedef redefinition with different types ('int' vs '__kernel_long_t' (aka 'long'))
-typedef int             __kernel_ptrdiff_t;
-                        ^
-include/vmlinux.h:49232:25: note: previous definition is here
-typedef __kernel_long_t __kernel_ptrdiff_t;
-                        ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:5:
-In file included from /usr/include/linux/types.h:9:
-In file included from /usr/include/linux/posix_types.h:36:
-In file included from /usr/include/asm/posix_types.h:7:
-In file included from /usr/include/asm/posix_types_64.h:18:
-/usr/include/asm-generic/posix_types.h:81:3: error: typedef redefinition with different types ('struct __kernel_fsid_t' vs 'struct __kernel_fsid_t')
-} __kernel_fsid_t;
-  ^
-include/vmlinux.h:23783:3: note: previous definition is here
-} __kernel_fsid_t;
-  ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:6:
-/usr/include/linux/time_types.h:7:8: error: redefinition of '__kernel_timespec'
-struct __kernel_timespec {
-       ^
-include/vmlinux.h:283:8: note: previous definition is here
-struct __kernel_timespec {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:6:
-/usr/include/linux/time_types.h:12:8: error: redefinition of '__kernel_itimerspec'
-struct __kernel_itimerspec {
-       ^
-include/vmlinux.h:36204:8: note: previous definition is here
-struct __kernel_itimerspec {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:6:
-/usr/include/linux/time_types.h:25:8: error: redefinition of '__kernel_old_timeval'
-struct __kernel_old_timeval {
-       ^
-include/vmlinux.h:30756:8: note: previous definition is here
-struct __kernel_old_timeval {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:6:
-/usr/include/linux/time_types.h:31:8: error: redefinition of '__kernel_old_timespec'
-struct __kernel_old_timespec {
-       ^
-include/vmlinux.h:115167:8: note: previous definition is here
-struct __kernel_old_timespec {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:6:
-/usr/include/linux/time_types.h:36:8: error: redefinition of '__kernel_old_itimerval'
-struct __kernel_old_itimerval {
-       ^
-include/vmlinux.h:36815:8: note: previous definition is here
-struct __kernel_old_itimerval {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-In file included from /usr/include/linux/time.h:6:
-/usr/include/linux/time_types.h:41:8: error: redefinition of '__kernel_sock_timeval'
-struct __kernel_sock_timeval {
-       ^
-include/vmlinux.h:115172:8: note: previous definition is here
-struct __kernel_sock_timeval {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-In file included from /usr/include/linux/timex.h:56:
-/usr/include/linux/time.h:31:8: error: redefinition of 'timezone'
-struct timezone {
-       ^
-include/vmlinux.h:36209:8: note: previous definition is here
-struct timezone {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-/usr/include/linux/timex.h:95:8: error: redefinition of '__kernel_timex_timeval'
-struct __kernel_timex_timeval {
-       ^
-include/vmlinux.h:36252:8: note: previous definition is here
-struct __kernel_timex_timeval {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:3:
-/usr/include/linux/timex.h:100:8: error: redefinition of '__kernel_timex'
-struct __kernel_timex {
-       ^
-include/vmlinux.h:36257:8: note: previous definition is here
-struct __kernel_timex {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:4:
-/usr/include/linux/capability.h:39:16: error: redefinition of '__user_cap_header_struct'
-typedef struct __user_cap_header_struct {
-               ^
-include/vmlinux.h:30976:8: note: previous definition is here
-struct __user_cap_header_struct {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:4:
-/usr/include/linux/capability.h:42:4: error: typedef redefinition with different types ('struct (unnamed struct at /usr/include/linux/capability.h:39:16) *' vs 'struct __user_cap_header_struct *')
-} *cap_user_header_t;
-   ^
-include/vmlinux.h:30981:42: note: previous definition is here
-typedef struct __user_cap_header_struct *cap_user_header_t;
-                                         ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:4:
-/usr/include/linux/capability.h:44:16: error: redefinition of '__user_cap_data_struct'
-typedef struct __user_cap_data_struct {
-               ^
-include/vmlinux.h:30983:8: note: previous definition is here
-struct __user_cap_data_struct {
-       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:4:
-/usr/include/linux/capability.h:48:4: error: typedef redefinition with different types ('struct (unnamed struct at /usr/include/linux/capability.h:44:16) *' vs 'struct __user_cap_data_struct *')
-} *cap_user_data_t;
-   ^
-include/vmlinux.h:30989:40: note: previous definition is here
-typedef struct __user_cap_data_struct *cap_user_data_t;
-                                       ^
-In file included from bpf/_llseek_monitor.bpf.c:9:
-In file included from include/common_event.h:4:
-/usr/include/linux/capability.h:72:8: error: redefinition of 'vfs_cap_data'
-struct vfs_cap_data {
-       ^
-include/vmlinux.h:62077:8: note: previous definition is here
-struct vfs_cap_data {
-       ^
+include/common_event.h:1334:18: note: forward declaration of 'struct timeval'
+    const struct timeval times2;
+                 ^
+include/common_event.h:1429:22: error: field has incomplete type 'struct itimerval'
+    struct itimerval curr_value;
+                     ^
+include/common_event.h:1429:12: note: forward declaration of 'struct itimerval'
+    struct itimerval curr_value;
+           ^
+include/common_event.h:1462:5: error: unknown type name 'id_t'
+    id_t who;
+    ^
+include/common_event.h:1536:20: error: field has incomplete type 'struct timeval'
+    struct timeval tv;
+                   ^
+include/common_event.h:1334:18: note: forward declaration of 'struct timeval'
+    const struct timeval times2;
+                 ^
+include/common_event.h:1606:21: error: field has incomplete type 'struct timespec'
+    struct timespec timeout;
+                    ^
+include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+    struct timespec res;
+           ^
 fatal error: too many errors emitted, stopping now [-ferror-limit=]
 20 errors generated.
 make: *** [Makefile:20: _llseek_monitor.bpf.o] Error 1
