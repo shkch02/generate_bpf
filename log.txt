@@ -1,9 +1,15 @@
-hkch@homesever:~/2025-1/autoeBPF$ make
+shkch@homesever:~/2025-1/autoeBPF$ make
 clang -O2 -g -Wall -Werror -target bpf -nostdinc -isystem /usr/include -isystem /usr/lib/llvm-14/lib/clang/14.0.0/../../include -isystem /usr/lib/llvm-14/lib/clang/14.0.0/../../../lib/clang/*/include  -Iinclude -I. -I/usr/src/linux-headers-5.15.0-142-generic/tools/lib/bpf/include -c bpf/_llseek_monitor.bpf.c -o _llseek_monitor.bpf.o
 In file included from bpf/_llseek_monitor.bpf.c:9:
-include/common_event.h:861:16: error: field has incomplete type 'const void'
-    const void payload;
-               ^
+include/common_event.h:835:5: error: unknown type name '__kernel_socklen_t'
+    __kernel_socklen_t addrlen;
+    ^
+include/common_event.h:842:5: error: unknown type name '__kernel_socklen_t'
+    __kernel_socklen_t addrlen;
+    ^
+include/common_event.h:861:10: error: field has incomplete type 'void'
+    void payload;
+         ^
 include/common_event.h:868:18: error: field has incomplete type 'struct timex'
     struct timex buf;
                  ^
@@ -31,65 +37,49 @@ include/common_event.h:902:30: error: field has incomplete type 'struct __user_c
 include/common_event.h:896:12: note: forward declaration of 'struct __user_cap_header'
     struct __user_cap_header hdrp;
            ^
+include/common_event.h:903:28: error: field has incomplete type 'struct __user_cap_data'
+    struct __user_cap_data datap;
+                           ^
+include/common_event.h:897:12: note: forward declaration of 'struct __user_cap_data'
+    struct __user_cap_data datap;
+           ^
 include/common_event.h:937:18: error: field has incomplete type 'struct timex'
     struct timex buf;
                  ^
 include/common_event.h:868:12: note: forward declaration of 'struct timex'
     struct timex buf;
            ^
-include/common_event.h:943:21: error: field has incomplete type 'struct timespec'
-    struct timespec res;
-                    ^
-include/common_event.h:943:12: note: forward declaration of 'struct timespec'
-    struct timespec res;
-           ^
-include/common_event.h:949:21: error: field has incomplete type 'struct timespec'
-    struct timespec tp;
-                    ^
-include/common_event.h:943:12: note: forward declaration of 'struct timespec'
-    struct timespec res;
-           ^
-include/common_event.h:956:21: error: field has incomplete type 'struct timespec'
-    struct timespec request;
-                    ^
-include/common_event.h:943:12: note: forward declaration of 'struct timespec'
-    struct timespec res;
-           ^
-include/common_event.h:957:21: error: field has incomplete type 'struct timespec'
-    struct timespec remain;
-                    ^
-include/common_event.h:943:12: note: forward declaration of 'struct timespec'
-    struct timespec res;
-           ^
-include/common_event.h:963:21: error: field has incomplete type 'struct timespec'
-    struct timespec tp;
-                    ^
-include/common_event.h:943:12: note: forward declaration of 'struct timespec'
-    struct timespec res;
-           ^
-include/common_event.h:1199:5: error: type name requires a specifier or qualifier
-    ... / arg _;
+include/common_event.h:991:5: error: unknown type name '__kernel_socklen_t'
+    __kernel_socklen_t addrlen;
     ^
-include/common_event.h:1199:5: error: expected member name or ';' after declaration specifiers
-include/common_event.h:1198:15: error: expected ';' at end of declaration list
-    __s32 cmd;
-              ^
-              ;
-include/common_event.h:1216:10: error: field has incomplete type 'void'
+include/common_event.h:1215:10: error: field has incomplete type 'void'
     void value;
          ^
-include/common_event.h:1260:16: error: field has incomplete type 'const void'
-    const void value;
-               ^
-include/common_event.h:1328:21: error: field has incomplete type 'struct timespec'
-    struct timespec timeout;
-                    ^
-include/common_event.h:943:12: note: forward declaration of 'struct timespec'
-    struct timespec res;
+include/common_event.h:1259:10: error: field has incomplete type 'void'
+    void value;
+         ^
+include/common_event.h:1344:10: error: field has incomplete type 'void'
+    void addr;
+         ^
+include/common_event.h:1383:10: error: field has incomplete type 'void'
+    void dirp;
+         ^
+include/common_event.h:1431:22: error: field has incomplete type 'struct itimerval'
+    struct itimerval curr_value;
+                     ^
+include/common_event.h:1431:12: note: forward declaration of 'struct itimerval'
+    struct itimerval curr_value;
            ^
-include/common_event.h:1329:5: error: type name requires a specifier or qualifier
-    / or: uint32_t val2 / uint32_t uaddr2;
+include/common_event.h:1438:5: error: unknown type name '__kernel_socklen_t'
+    __kernel_socklen_t addrlen;
     ^
+include/common_event.h:1464:5: error: unknown type name 'id_t'
+    id_t who;
+    ^
+include/common_event.h:1469:10: error: field has incomplete type 'void'
+    void buf;
+         ^
 fatal error: too many errors emitted, stopping now [-ferror-limit=]
 20 errors generated.
 make: *** [Makefile:20: _llseek_monitor.bpf.o] Error 1
+shkch@homesever:~/2025-1/autoeBPF$

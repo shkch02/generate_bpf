@@ -157,23 +157,28 @@ def make_bindings(name, types, arg_names):
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
         parm = f"PT_REGS_PARM{idx}(ctx)"
-        # 포인터 타입 처리
-        if '*' in typ:
-            # MODIFIED: struct 포인터와 문자열 포인터를 구분하여 처리
-            if 'struct' in typ:
-                # struct 포인터는 bpf_probe_read_user로 전체 구조체 복사
-                lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
-            elif 'char' in typ:
-                # 문자열 포인터는 bpf_probe_read_user_str로 복사
+        
+        field_type = typ.replace('const', '').strip()
+        is_pointer = '*' in field_type
+        base_type = field_type.replace('*', '').strip()
+
+        # This logic must mirror the decisions made in generate_common_event
+        if base_type == 'void' and is_pointer:
+            # It was a `void *`, we created a `_ptr` field. Just store the address.
+            lines.append(f"    e->data.{name}.{var}_ptr = (u64)({typ}){parm};")
+        elif is_pointer:
+            # It was a pointer, and we created a field to hold the data.
+            # We need to read it from user space.
+            if 'char' in base_type:
+                # String pointer
                 lines.append(f"    bpf_probe_read_user_str(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
-            else: # 기타 기본 타입 포인터 (int*, long* 등)
+            else:
+                # Other data pointer (e.g., struct *)
                 lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
-        # MODIFIED: typedef된 구조체 포인터 처리 (TYPEDEF_TO_UNDERLYING_TYPE에 정의된 경우)
-        elif typ in TYPEDEF_TO_UNDERLYING_TYPE:
-            lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
-        # 일반 타입 처리
         else:
+            # Not a pointer, just a direct assignment.
             lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
+            
     return "\n".join(lines)
 
 # --- .bpf.c 파일 생성 ---
@@ -450,14 +455,25 @@ def generate_common_event(df):
     }};
 """)
 
-    # 커널 타입 이름으로 변환하기 위한 맵
+    # 유저랜드 타입을 커널 vmlinux.h 타입으로 변환하기 위한 맵
     TYPE_MAP = {{
+        "socklen_t": "__kernel_socklen_t",
+        "pid_t": "__kernel_pid_t",
+        "uid_t": "__kernel_uid32_t",
+        "gid_t": "__kernel_gid32_t",
+        "size_t": "__kernel_size_t",
+        "ssize_t": "__kernel_ssize_t",
+        "loff_t": "__kernel_loff_t",
+        "time_t": "__kernel_time64_t",
+        "dev_t": "__kernel_dev_t",
+        "ino_t": "u64",
+        "mode_t": "umode_t",
         "struct timespec": "struct __kernel_timespec",
         "struct timeval": "struct __kernel_old_timeval",
-        "socklen_t": "__kernel_socklen_t",
         "struct timex": "struct timex",
         "cap_user_header_t": "struct __user_cap_header",
         "cap_user_data_t": "struct __user_cap_data",
+        # Add other mappings as needed based on compilation errors
     }}
 
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
@@ -475,32 +491,35 @@ def generate_common_event(df):
         fields = []
         for typ, var in zip(types, arg_names):
             field_type = typ.replace('const', '').strip()
-            
             is_pointer = '*' in field_type
             base_type = field_type.replace('*', '').strip()
-            
-            # 기본 타입을 커널 타입으로 변환
-            translated_base_type = TYPE_MAP.get(base_type, base_type)
 
-            if is_pointer:
-                if 'char' in base_type:
-                    fields.append(f"    char {var}[MAX_STR_LEN];")
+            if base_type == 'void':
+                if is_pointer:
+                    # For `void *`, we can't know the size to read. Store as a pointer.
+                    fields.append(f"    __u64 {var}_ptr;")
                 else:
-                    # 다른 포인터 타입의 경우, 역참조된 값을 저장할 필드를 생성
-                    fields.append(f"    {translated_base_type} {var};")
+                    # `void` type for a field is invalid. Skip.
+                    continue
+            elif is_pointer and 'char' in base_type:
+                # Special handling for strings
+                fields.append(f"    char {var}[MAX_STR_LEN];")
             else:
-                # 포인터가 아닌 타입
-                fields.append(f"    {translated_base_type} {var};")
-
+                # For all other types, define a field for the data itself.
+                # The BPF code will be responsible for populating it.
+                # Translate the base type to its kernel equivalent.
+                final_type = TYPE_MAP.get(base_type, base_type)
+                fields.append(f"    {final_type} {var};")
+        
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
         struct_lines.append(struct_code)
         union_lines.append(f"        struct {base}_event_t {base};")
 
     content = HEADER.format(
-        enum_entries="\n".join(enum_lines),
-        enum_strings="\n".join(enum_strings),
-        struct_definitions="\n".join(struct_lines),
-        union_entries="\n".join(union_lines)
+        enum_entries='\n'.join(enum_lines),
+        enum_strings='\n'.join(enum_strings),
+        struct_definitions='\n'.join(struct_lines),
+        union_entries='\n'.join(union_lines)
     )
     os.makedirs(os.path.dirname(EVENT_HDR), exist_ok=True)
     with open(EVENT_HDR, 'w') as f:
