@@ -484,8 +484,8 @@ def generate_common_event(df):
 
             # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
             mapping = {
-                'socklen_t': '__kernel_socklen_t',
-                'id_t':       '__kernel_pid_t', # 또는 __u32
+                'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h
+                'id_t':       '__kernel_pid_t',
                 'nfds_t':     '__u32',
                 'caddr_t':    '__u64',
                 'off64_t':    '__s64',
@@ -493,7 +493,7 @@ def generate_common_event(df):
                 'clockid_t':  '__kernel_clockid_t',
                 'timer_t':    '__kernel_timer_t',
                 'dev_t':      '__kernel_dev_t',
-                'ino_t':      '__kernel_ino_t', # vmlinux.h에 정의되어 있다면
+                'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet
                 'mode_t':     'umode_t',
                 'uid_t':      '__kernel_uid32_t',
                 'gid_t':      '__kernel_gid32_t',
@@ -501,6 +501,9 @@ def generate_common_event(df):
                 'ssize_t':    '__kernel_ssize_t',
                 'loff_t':     '__kernel_loff_t',
                 'pid_t':      '__kernel_pid_t',
+                'sighandler_t': '__sighandler_t', # Added based on log
+                'idtype_t': '__s32', # Added based on log, typically an int
+                'enum __ptrace_request': '__s32', # Added based on log, typically an int
                 # 필요시 더 추가…
             }
             if core in mapping:
@@ -514,8 +517,8 @@ def generate_common_event(df):
                 'struct __user_cap_data',
                 'struct __kernel_timespec',
                 'struct __kernel_old_timeval',
-                'struct timex',
-                'struct itimerval',
+                'struct timex', # Assuming this exists, if not, it will error again.
+                'struct itimerval', # Assuming this exists, if not, it will error again.
                 # 필요시 더 추가…
             }
             if core in btf_structs:
