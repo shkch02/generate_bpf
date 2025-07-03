@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+#해당 코드는 ubuntutu 22.04 LTS에서 실행됨
 import os
 import subprocess
 import re
@@ -118,6 +119,10 @@ def get_syscall_info(row, syscall_name):
     arg_names = get_proto(syscall_name)
     # 인자 이름의 개수가 타입 개수와 다를 경우, 기본값으로 대체
     if len(arg_names) != len(types):
+        # DEBUG: Print detailed info before warning
+        print(f"\n[Debug] Mismatch for syscall: '{syscall_name}'")
+        print(f"  - Types from CSV (count: {len(types)}): {types}")
+        print(f"  - Names from man page (count: {len(arg_names)}): {arg_names}")
         # IMPROVEMENT: More informative log message
         print(f"[Warning] Failed to get arg names for \"{syscall_name}\" from man page. Using default names (arg0, arg1, ...).")
         arg_names = [f"arg{i}" for i in range(len(types))]
