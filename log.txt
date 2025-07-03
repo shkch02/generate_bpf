@@ -1,113 +1,107 @@
-hkch@homesever:~/2025-1/autoeBPF$ make
-clang -O2 -g -Wall -Werror -target bpf -nostdinc -isystem /usr/lib/llvm-14/lib/clang/14.0.0/../../include -isystem /usr/lib/llvm-14/lib/clang/14.0.0/../../../lib/clang/*/include -isystem /usr/include -isystem /usr/src/linux-headers-5.15.0-142-generic/include/uapi  -Iinclude -I. -I/usr/src/linux-headers-5.15.0-142-generic/tools/lib/bpf/include -c bpf/_llseek_monitor.bpf.c -o _llseek_monitor.bpf.o
-In file included from bpf/_llseek_monitor.bpf.c:9:
-include/common_event.h:865:18: error: field has incomplete type 'struct timex'
+include/common_event.h:866:18: error: field has incomplete type 'struct timex'
     struct timex buf;
                  ^
-include/common_event.h:865:12: note: forward declaration of 'struct timex'
+include/common_event.h:866:12: note: forward declaration of 'struct timex'
     struct timex buf;
            ^
-include/common_event.h:893:30: error: field has incomplete type 'struct __user_cap_header'
+include/common_event.h:894:30: error: field has incomplete type 'struct __user_cap_header'
     struct __user_cap_header hdrp;
                              ^
-include/common_event.h:893:12: note: forward declaration of 'struct __user_cap_header'
+include/common_event.h:894:12: note: forward declaration of 'struct __user_cap_header'
     struct __user_cap_header hdrp;
            ^
-include/common_event.h:894:28: error: field has incomplete type 'struct __user_cap_data'
+include/common_event.h:895:28: error: field has incomplete type 'struct __user_cap_data'
     struct __user_cap_data datap;
                            ^
-include/common_event.h:894:12: note: forward declaration of 'struct __user_cap_data'
+include/common_event.h:895:12: note: forward declaration of 'struct __user_cap_data'
     struct __user_cap_data datap;
            ^
-include/common_event.h:899:30: error: field has incomplete type 'struct __user_cap_header'
+include/common_event.h:900:30: error: field has incomplete type 'struct __user_cap_header'
     struct __user_cap_header hdrp;
                              ^
-include/common_event.h:893:12: note: forward declaration of 'struct __user_cap_header'
+include/common_event.h:894:12: note: forward declaration of 'struct __user_cap_header'
     struct __user_cap_header hdrp;
            ^
-include/common_event.h:934:18: error: field has incomplete type 'struct timex'
+include/common_event.h:935:18: error: field has incomplete type 'struct timex'
     struct timex buf;
                  ^
-include/common_event.h:865:12: note: forward declaration of 'struct timex'
+include/common_event.h:866:12: note: forward declaration of 'struct timex'
     struct timex buf;
            ^
-include/common_event.h:940:21: error: field has incomplete type 'struct timespec'
+include/common_event.h:941:21: error: field has incomplete type 'struct timespec'
     struct timespec res;
                     ^
-include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+include/common_event.h:941:12: note: forward declaration of 'struct timespec'
     struct timespec res;
            ^
-include/common_event.h:946:21: error: field has incomplete type 'struct timespec'
+include/common_event.h:947:21: error: field has incomplete type 'struct timespec'
     struct timespec tp;
                     ^
-include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+include/common_event.h:941:12: note: forward declaration of 'struct timespec'
     struct timespec res;
            ^
-include/common_event.h:953:27: error: field has incomplete type 'const struct timespec'
+include/common_event.h:954:27: error: field has incomplete type 'const struct timespec'
     const struct timespec request;
                           ^
-include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+include/common_event.h:941:12: note: forward declaration of 'struct timespec'
     struct timespec res;
            ^
-include/common_event.h:954:21: error: field has incomplete type 'struct timespec'
+include/common_event.h:955:21: error: field has incomplete type 'struct timespec'
     struct timespec remain;
                     ^
-include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+include/common_event.h:941:12: note: forward declaration of 'struct timespec'
     struct timespec res;
            ^
-include/common_event.h:960:27: error: field has incomplete type 'const struct timespec'
+include/common_event.h:961:27: error: field has incomplete type 'const struct timespec'
     const struct timespec tp;
                           ^
-include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+include/common_event.h:941:12: note: forward declaration of 'struct timespec'
     struct timespec res;
            ^
-include/common_event.h:965:15: error: expected ')'
+include/common_event.h:966:15: error: expected ')'
     __s32 (*fn;
               ^
-include/common_event.h:965:11: note: to match this '('
+include/common_event.h:966:11: note: to match this '('
     __s32 (*fn;
           ^
-include/common_event.h:1196:10: error: expected member name or ';' after declaration specifiers
-    char /[MAX_STR_LEN];
+include/common_event.h:1197:10: error: expected member name or ';' after declaration specifiers
+    char [MAX_STR_LEN];
     ~~~~ ^
-include/common_event.h:1196:9: error: expected ';' at end of declaration list
-    char /[MAX_STR_LEN];
-        ^
-        ;
-include/common_event.h:1325:27: error: field has incomplete type 'const struct timespec'
+include/common_event.h:1326:27: error: field has incomplete type 'const struct timespec'
     const struct timespec timeout;
                           ^
-include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+include/common_event.h:941:12: note: forward declaration of 'struct timespec'
     struct timespec res;
            ^
-include/common_event.h:1334:26: error: field has incomplete type 'const struct timeval'
+include/common_event.h:1335:26: error: field has incomplete type 'const struct timeval'
     const struct timeval times2;
                          ^
-include/common_event.h:1334:18: note: forward declaration of 'struct timeval'
+include/common_event.h:1335:18: note: forward declaration of 'struct timeval'
     const struct timeval times2;
                  ^
-include/common_event.h:1429:22: error: field has incomplete type 'struct itimerval'
+include/common_event.h:1430:22: error: field has incomplete type 'struct itimerval'
     struct itimerval curr_value;
                      ^
-include/common_event.h:1429:12: note: forward declaration of 'struct itimerval'
+include/common_event.h:1430:12: note: forward declaration of 'struct itimerval'
     struct itimerval curr_value;
            ^
-include/common_event.h:1462:5: error: unknown type name 'id_t'
+include/common_event.h:1463:5: error: unknown type name 'id_t'
     id_t who;
     ^
-include/common_event.h:1536:20: error: field has incomplete type 'struct timeval'
+include/common_event.h:1537:20: error: field has incomplete type 'struct timeval'
     struct timeval tv;
                    ^
-include/common_event.h:1334:18: note: forward declaration of 'struct timeval'
+include/common_event.h:1335:18: note: forward declaration of 'struct timeval'
     const struct timeval times2;
                  ^
-include/common_event.h:1606:21: error: field has incomplete type 'struct timespec'
+include/common_event.h:1607:21: error: field has incomplete type 'struct timespec'
     struct timespec timeout;
                     ^
-include/common_event.h:940:12: note: forward declaration of 'struct timespec'
+include/common_event.h:941:12: note: forward declaration of 'struct timespec'
     struct timespec res;
            ^
+include/common_event.h:1647:6: error: type name requires a specifier or qualifier
+     ...;
+     ^
 fatal error: too many errors emitted, stopping now [-ferror-limit=]
 20 errors generated.
-make: *** [Makefile:20: _llseek_monitor.bpf.o] Error 1
-shkch@homesever:~/2025-1/autoeBPF$

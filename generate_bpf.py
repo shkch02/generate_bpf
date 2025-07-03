@@ -81,21 +81,37 @@ def get_proto(syscall):
     types = []
     names = []
     for p in parts:
-        if p.lower().strip() == 'void':
+        p_clean = p.strip()
+        # Skip void, variadic args, and other malformed parts
+        if p_clean.lower() == 'void' or p_clean == '...' or not p_clean:
             continue
         
-        toks = p.split()
+        toks = p_clean.split()
         if not toks:
             continue
             
-        # The argument name is usually the last word
-        name = toks[-1]
-        # Remove potential array brackets or pointer asterisks from the name
+        # Handle function pointers crudely - take the whole thing as type and make up a name
+        if '(' in p_clean and ')' in p_clean and '*' in p_clean:
+            typ = p_clean
+            name = f"func_ptr_{len(names)}"
+        else:
+            name = toks[-1]
+            typ = " ".join(toks[:-1]).strip()
+
+        # If type is empty after split, it's likely a single-word declaration like '...'
+        # which should be caught above, but as a safeguard, we skip.
+        if not typ:
+            continue
+
+        # Sanitize the name to be a valid C identifier
         name = name.replace('[', '').replace(']', '').lstrip('*')
-        names.append(name)
+        name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
         
-        # Everything before the last word is the type
-        typ = " ".join(toks[:-1]).strip()
+        # If name is empty after sanitizing (e.g. from 'int*'), assign a generic one
+        if not name or name in ['void']:
+             name = f"arg{len(names)}"
+        
+        names.append(name)
         types.append(typ)
         
     return types, names
@@ -382,6 +398,10 @@ def generate_common_event(df):
     """ eBPF와 로더가 공용으로 사용하는 헤더 파일(common_event.h)을 생성 """
     HEADER = textwrap.dedent("""
     #pragma once
+    #include <linux/types.h>
+    #include <linux/time.h>
+    #include <linux/capability.h>
+    #include <linux/socket.h>
 
     // IMPROVEMENT: Increased max string length for paths, etc.
     // This is a hard limit; longer strings will be truncated.
@@ -429,23 +449,37 @@ def generate_common_event(df):
         
         fields = []
         for typ, var in zip(types, arg_names):
+            # Handle pointer types first
             if '*' in typ:
-                # Check for known typedef struct pointers
-                if re.search(r'\bcap_user_header_t\b|\bcap_user_data_t\b', typ):
-                    # Extract the base type (e.g., cap_user_header_t from cap_user_header_t*)
-                    base_type = typ.replace('*', '').strip()
-                    fields.append(f"    {base_type} {var};")
-                elif 'struct' in typ: # Original struct pointer handling
-                    struct_type = typ.replace('*', '').strip()
-                    fields.append(f"    {struct_type} {var};")
-                else: # Other pointers (assume char* for now, or basic types)
+                # For string pointers, use a fixed-size char array
+                if 'char' in typ:
                     fields.append(f"    char {var}[MAX_STR_LEN];")
-            else:
-                # Handle known typedefs that are pointers to structs
-                if typ in TYPEDEF_TO_UNDERLYING_TYPE:
-                    ktyp = TYPEDEF_TO_UNDERLYING_TYPE[typ]
+                # For struct pointers, use the struct type directly (without the pointer star)
+                # This relies on the struct definition being available from vmlinux.h
+                elif 'struct' in typ:
+                    clean_type = typ.replace('*' , '').replace('const', '').strip()
+                    fields.append(f"    {clean_type} {var};")
+                # For other basic pointers (int*, etc.), store the value pointed to
                 else:
-                    # IMPROVEMENT: Expanded mapping for kernel types
+                    base_type = typ.replace('*' , '').replace('const', '').strip()
+                    ktyp = {
+                        'int': '__s32', 'unsigned int': '__u32',
+                        'long': '__s64', 'unsigned long': '__u64',
+                        'size_t': '__u64', 'ssize_t': '__s64',
+                    }.get(base_type, base_type)
+                    fields.append(f"    {ktyp} {var};")
+            # Handle non-pointer types
+            else:
+                # For structs passed by value (rare), just use the type
+                if 'struct' in typ:
+                    clean_type = typ.replace('const', '').strip()
+                    fields.append(f"    {clean_type} {var};")
+                # Handle known typedefs
+                elif typ in TYPEDEF_TO_UNDERLYING_TYPE:
+                    ktyp = TYPEDEF_TO_UNDERLYING_TYPE[typ]
+                    fields.append(f"    {ktyp} {var};")
+                # Handle basic types
+                else:
                     ktyp = {
                         'int': '__s32', 'unsigned int': '__u32',
                         'long': '__s64', 'unsigned long': '__u64',
@@ -456,11 +490,9 @@ def generate_common_event(df):
                         'dev_t': '__u64', 'ino_t': '__u64',
                         'time_t': '__s64', 'clockid_t': '__s32',
                         'key_t': '__s32', 'qid_t': '__u32',
-                        'socklen_t': '__u32', # Map socklen_t to __u32
-                        'void': '__u64', # Map void to __u64 (for pointers)
-                        'const void': '__u64', # Map const void to __u64 (for pointers)
+                        'socklen_t': '__u32',
                     }.get(typ, typ) # Default to itself if not in map
-                fields.append(f"    {ktyp} {var};")
+                    fields.append(f"    {ktyp} {var};")
         
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
         struct_lines.append(struct_code)
