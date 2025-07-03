@@ -171,16 +171,7 @@ CC      = clang
 LLVM_SYSROOT := $(shell $(CC) --print-resource-dir)/../..
 KERNEL_SRCDIR ?= /usr/src/linux-headers-$(shell uname -r)
 
-CFLAGS := \
-    -O2 -g -Wall -Werror \
-    -target bpf \
-    -nostdinc                                 \
-    -isystem $(LLVM_SYSROOT)/include          \
-    -isystem $(LLVM_SYSROOT)/../lib/clang/*/include \
-    -isystem $(KERNEL_SRCDIR)/include/uapi     \
-    -Iinclude                                 \
-    -I.                                       \
-    -I$(KERNEL_SRCDIR)/tools/lib/bpf/include    # libbpf helper 헤더
+CFLAGS := -O2 -g -Wall -Werror -target bpf -nostdinc -isystem $(LLVM_SYSROOT)/include -isystem $(LLVM_SYSROOT)/../lib/clang/*/include -isystem $(KERNEL_SRCDIR)/include/uapi -Iinclude -I. -I$(KERNEL_SRCDIR)/tools/lib/bpf/include
                            
 # 모든 bpf 오브젝트와 스켈레톤 헤더를 빌드
 TARGETS := {targets}
