@@ -157,29 +157,27 @@ def make_bindings(name, types, arg_names):
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
         parm = f"PT_REGS_PARM{idx}(ctx)"
-        
+        # const 제거, 포인터 여부 및 기본 타입 분리
         field_type = typ.replace('const', '').strip()
         is_pointer = '*' in field_type
         base_type = field_type.replace('*', '').strip()
 
-        # This logic must mirror the decisions made in generate_common_event
-        if base_type == 'void' and is_pointer:
-            # It was a `void *`, we created a `_ptr` field. Just store the address.
-            lines.append(f"    e->data.{name}.{var}_ptr = (u64)({typ}){parm};")
-        elif is_pointer:
-            # It was a pointer, and we created a field to hold the data.
-            # We need to read it from user space.
-            if 'char' in base_type:
-                # String pointer
-                lines.append(f"    bpf_probe_read_user_str(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
+        if is_pointer:
+            if base_type == 'char':
+                # char *: 문자열만 복사
+                lines.append(
+                    f"    bpf_probe_read_user_str(&e->data.{name}.{var}, "
+                    f"sizeof(e->data.{name}.{var}), (void*){parm});")
             else:
-                # Other data pointer (e.g., struct *)
-                lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
+                # 그 외 모든 포인터: 주소를 _ptr 필드에 저장
+                lines.append(
+                    f"    e->data.{name}.{var}_ptr = (u64){parm};")
         else:
-            # Not a pointer, just a direct assignment.
+            # 포인터가 아니면 직접 대입
             lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
-            
+
     return "\n".join(lines)
+
 
 # --- .bpf.c 파일 생성 ---
 def generate_bpf_sources(syscalls, df):
@@ -486,6 +484,8 @@ def generate_common_event(df):
             mapping = {
                 'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
                 'id_t':       '__kernel_pid_t',
+                'struct timeval':  'struct __kernel_old_timeval',
+                'struct timespec': 'struct __kernel_timespec',
                 'nfds_t':     '__u32',
                 'caddr_t':    '__u64',
                 'off64_t':    '__s64',
