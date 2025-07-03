@@ -77,40 +77,51 @@ def get_proto(syscall):
     if not m:
         return [], [] # Return empty types and names
     
-    parts = [p.strip() for p in m.group(1).split(',')]
+    # Clean the argument string: remove comments, split by comma
+    arg_string = m.group(1)
+    arg_string = re.sub(r'/\*.*?\*/', '', arg_string) # remove C-style comments
+    parts = [p.strip() for p in arg_string.split(',')]
+    
     types = []
     names = []
     for p in parts:
         p_clean = p.strip()
-        # Skip void, variadic args, and other malformed parts
-        if p_clean.lower() == 'void' or p_clean == '...' or not p_clean:
+        
+        # Skip void, variadic args, function pointers, and other malformed parts
+        if p_clean.lower() == 'void' or '...' in p_clean or '(' in p_clean or not p_clean:
             continue
         
+        # Handle cases like "int flags / unsigned int mode" - take the first one
+        if '/' in p_clean:
+            p_clean = p_clean.split('/')[0].strip()
+
         toks = p_clean.split()
         if not toks:
             continue
             
-        # Handle function pointers crudely - take the whole thing as type and make up a name
-        if '(' in p_clean and ')' in p_clean and '*' in p_clean:
-            typ = p_clean
-            name = f"func_ptr_{len(names)}"
-        else:
-            name = toks[-1]
-            typ = " ".join(toks[:-1]).strip()
+        # The last token is the name, the rest is the type
+        name = toks[-1]
+        typ = " ".join(toks[:-1]).strip()
 
-        # If type is empty after split, it's likely a single-word declaration like '...'
-        # which should be caught above, but as a safeguard, we skip.
+        # If type is empty, it's a malformed entry, skip it.
         if not typ:
             continue
 
         # Sanitize the name to be a valid C identifier
+        # Remove array brackets and leading asterisks for pointer notation
         name = name.replace('[', '').replace(']', '').lstrip('*')
-        name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+        # A more restrictive sanitizer to avoid creating invalid identifiers
+        name = re.sub(r'[^a-zA-Z0-9_]', '', name)
         
-        # If name is empty after sanitizing (e.g. from 'int*'), assign a generic one
+        # If name is empty after sanitizing (e.g. from 'int *'), assign a generic one
         if not name or name in ['void']:
              name = f"arg{len(names)}"
         
+        # Handle `const void *` -> becomes `const void` type, which is invalid for a field.
+        # We can't really handle `void *`, as we don't know what it points to or its size.
+        if typ.strip() == 'void' or typ.strip() == 'const void':
+            continue
+
         names.append(name)
         types.append(typ)
         
@@ -398,11 +409,10 @@ def generate_common_event(df):
     """ eBPF와 로더가 공용으로 사용하는 헤더 파일(common_event.h)을 생성 """
     HEADER = textwrap.dedent("""
     #pragma once
-    #include <linux/types.h>
-    #include <linux/time.h>
-    #include <linux/capability.h>
-    #include <linux/socket.h>
-
+#include <vmlinux.h>
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
+                             
     // IMPROVEMENT: Increased max string length for paths, etc.
     // This is a hard limit; longer strings will be truncated.
     #define MAX_STR_LEN 1024
