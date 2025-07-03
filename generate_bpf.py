@@ -421,10 +421,15 @@ def generate_common_event(df):
         fields = []
         for typ, var in zip(types, arg_names):
             if '*' in typ:
-                if 'struct' in typ:
+                # Check for known typedef struct pointers
+                if re.search(r'\bcap_user_header_t\b|\bcap_user_data_t\b', typ):
+                    # Extract the base type (e.g., cap_user_header_t from cap_user_header_t*)
+                    base_type = typ.replace('*', '').strip()
+                    fields.append(f"    {base_type} {var};")
+                elif 'struct' in typ: # Original struct pointer handling
                     struct_type = typ.replace('*', '').strip()
                     fields.append(f"    {struct_type} {var};")
-                else:
+                else: # Other pointers (assume char* for now, or basic types)
                     fields.append(f"    char {var}[MAX_STR_LEN];")
             else:
                 # IMPROVEMENT: Expanded mapping for kernel types
