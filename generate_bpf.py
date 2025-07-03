@@ -459,50 +459,24 @@ def generate_common_event(df):
         
         fields = []
         for typ, var in zip(types, arg_names):
-            # Handle pointer types first
-            if '*' in typ:
-                # For string pointers, use a fixed-size char array
-                if 'char' in typ:
+            # Per user request, use type names directly, assuming vmlinux.h provides them.
+            # This removes explicit mapping to __s32 etc. and relies on the type
+            # from the man page being a valid C type in the compilation context.
+            
+            field_type = typ.replace('const', '').strip()
+
+            if '*' in field_type:
+                # For string pointers, use a fixed-size char array.
+                if 'char' in field_type:
                     fields.append(f"    char {var}[MAX_STR_LEN];")
-                # For struct pointers, use the struct type directly (without the pointer star)
-                # This relies on the struct definition being available from vmlinux.h
-                elif 'struct' in typ:
-                    clean_type = typ.replace('*' , '').replace('const', '').strip()
-                    fields.append(f"    {clean_type} {var};")
-                # For other basic pointers (int*, etc.), store the value pointed to
+                # For other pointers (including struct pointers), we are reading the data
+                # into a field of the base type.
                 else:
-                    base_type = typ.replace('*' , '').replace('const', '').strip()
-                    ktyp = {
-                        'int': '__s32', 'unsigned int': '__u32',
-                        'long': '__s64', 'unsigned long': '__u64',
-                        'size_t': '__u64', 'ssize_t': '__s64',
-                    }.get(base_type, base_type)
-                    fields.append(f"    {ktyp} {var};")
-            # Handle non-pointer types
+                    base_type = field_type.replace('*', '').strip()
+                    fields.append(f"    {base_type} {var};")
             else:
-                # For structs passed by value (rare), just use the type
-                if 'struct' in typ:
-                    clean_type = typ.replace('const', '').strip()
-                    fields.append(f"    {clean_type} {var};")
-                # Handle known typedefs
-                elif typ in TYPEDEF_TO_UNDERLYING_TYPE:
-                    ktyp = TYPEDEF_TO_UNDERLYING_TYPE[typ]
-                    fields.append(f"    {ktyp} {var};")
-                # Handle basic types
-                else:
-                    ktyp = {
-                        'int': '__s32', 'unsigned int': '__u32',
-                        'long': '__s64', 'unsigned long': '__u64',
-                        'size_t': '__u64', 'ssize_t': '__s64',
-                        'pid_t': '__s32', 'uid_t': '__u32', 'gid_t': '__u32',
-                        'mode_t': '__u32', 'umode_t': '__u16',
-                        'off_t': '__s64', 'loff_t': '__s64',
-                        'dev_t': '__u64', 'ino_t': '__u64',
-                        'time_t': '__s64', 'clockid_t': '__s32',
-                        'key_t': '__s32', 'qid_t': '__u32',
-                        'socklen_t': '__u32',
-                    }.get(typ, typ) # Default to itself if not in map
-                    fields.append(f"    {ktyp} {var};")
+                # For non-pointer types, use the type directly.
+                fields.append(f"    {field_type} {var};")
         
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
         struct_lines.append(struct_code)
