@@ -109,7 +109,7 @@ def get_syscall_info(row, syscall_name):
     # BUGFIX: x86_64 레지스터 순서(rdi, rsi, rdx, r10, r8, r9)를 정확히 매핑
     regs = ['di', 'si', 'dx', '10', '8', '9']
     for i in range(6):
-        col = f'arg{i}(%{regs[i]})'
+        col = f'arg{i}(%r{regs[i]})'
         # BUGFIX: `row[col] = '-'` 를 `row[col] != '-'` 로 수정
         if col in row and isinstance(row[col], str) and row[col] != '-':
             # 타입 정보만 추출 (e.g., 'const char *' -> 'const char*')
