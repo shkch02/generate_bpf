@@ -104,8 +104,7 @@ def parse_csv():
         exit(1)
     syscalls = []  # list of (alias, base)
     for base in df['syscall name'].unique():
-        for alias in alias_map.get(base, [base]):
-            syscalls.append((alias, base))
+        syscalls.append((base, base)) # alias_map 없이 기본 이름만 사용
     return syscalls, df
 
 # --- REFACTOR: 중복 로직을 헬퍼 함수로 추출 ---
@@ -212,11 +211,12 @@ void sig_handler(int sig) {{
 }}
 
 // IMPROVEMENT: Kafka delivery report callback
-static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
-    if (rkmessage->err) {
-        fprintf(stderr, "%% Message delivery failed: %%s\n", rd_kafka_err2str(rkmessage->err));
-    }
-}}
+static void dr_msg_cb(rd_kafka_t *rk, const                
+            rd_kafka_message_t *rkmessage, void *opaque)               
+            {{{    if (rkmessage->err) {{                               
+           fprintf(stderr, "%% Message delivery failed:               
+            %%s\n", rd_kafka_err2str(rkmessage->err));                 
+            }}}}
 
 static void kafka_init() {{
     char errstr[512];
