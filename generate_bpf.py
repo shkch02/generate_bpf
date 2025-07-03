@@ -35,12 +35,19 @@ BPF_TEMPLATE = textwrap.dedent("""
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
-#include <linux/string.h>
 
 #include "common_maps.h"
 #include "common_event.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
+
+static __attribute__((always_inline)) bool starts_with(const char *s, const char *prefix, __u32 n) {{
+      for ( __u32 i = 0; i < n; i++) {
+          if (s[i] != prefix[i]) return false;
+          if (s[i] == 0)       return false;
+      }
+      return true;
+  }}                               
 
 SEC("kprobe/__x64_sys_{name}")
 int trace_{name}(struct pt_regs *ctx) {{
@@ -48,10 +55,10 @@ int trace_{name}(struct pt_regs *ctx) {{
     bpf_get_current_comm(&comm, sizeof(comm));
 
     // 컨테이너 런타임(runc, conmon 등)이 아니면 추적하지 않음
-    if (strncmp(comm, "runc", 4) != 0 &&
-        strncmp(comm, "conmon", 6) != 0 &&
-        strncmp(comm, "containerd-shim", 15) != 0 &&
-        strncmp(comm, "docker", 6) != 0) {{
+  if (!starts_with(comm, "runc", 4) &&
+        !starts_with(comm, "conmon", 6) &&
+        !starts_with(comm, "containerd-shim", 15) &&
+        !starts_with(comm, "docker", 6)) {{}
         return 0;
     }}
 
