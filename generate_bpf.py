@@ -382,14 +382,6 @@ def generate_common_event(df):
     """ eBPF와 로더가 공용으로 사용하는 헤더 파일(common_event.h)을 생성 """
     HEADER = textwrap.dedent("""
     #pragma once
-    #include <linux/timex.h>
-    #include <linux/capability.h>
-    #include <linux/time.h>
-    #include <linux/socket.h>
-    #include <linux/in.h>
-    #include <linux/in6.h>
-    #include <linux/un.h>
-    #include <linux/net.h>
 
     // IMPROVEMENT: Increased max string length for paths, etc.
     // This is a hard limit; longer strings will be truncated.
