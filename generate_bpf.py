@@ -30,8 +30,8 @@ TYPEDEF_TO_UNDERLYING_TYPE = {
 BPF_TEMPLATE = textwrap.dedent("""
 #define __TARGET_ARCH_x86
 #include <vmlinux.h>
-#include <bpf_helpers.h>
-#include <bpf_tracing.h>
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
 #include <linux/string.h>
 
 #include "common_maps.h"
@@ -171,7 +171,7 @@ CC      = clang
 LLVM_SYSROOT := $(shell $(CC) --print-resource-dir)/../..
 KERNEL_SRCDIR ?= /usr/src/linux-headers-$(shell uname -r)
 
-CFLAGS := -O2 -g -Wall -Werror -target bpf -nostdinc -isystem $(LLVM_SYSROOT)/include -isystem $(LLVM_SYSROOT)/../lib/clang/*/include -isystem $(KERNEL_SRCDIR)/include/uapi -Iinclude -I. -I$(KERNEL_SRCDIR)/tools/lib/bpf/include
+CFLAGS := -O2 -g -Wall -Werror -target bpf -nostdinc -isystem $(LLVM_SYSROOT)/include -isystem $(LLVM_SYSROOT)/../lib/clang/*/include -isystem $(KERNEL_SRCDIR)/include/uapi -isystem /usr/include/bpf -Iinclude -I. -I$(KERNEL_SRCDIR)/tools/lib/bpf/include
                            
 # 모든 bpf 오브젝트와 스켈레톤 헤더를 빌드
 TARGETS := {targets}
