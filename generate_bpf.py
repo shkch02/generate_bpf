@@ -157,7 +157,7 @@ def get_syscall_info(row, syscall_name):
 # --- 인자 바인딩 생성 ---
 def make_bindings(name, types, arg_names):
     """ eBPF 코드에 삽입될 인자 바인딩 C 코드를 생성 """
-    # 사용자-공간 typedef 를 커널 BTF에 맞게 매핑
+    # 사용자-공간 typedef → 커널 BTF 매핑
     typedef_map = {
         'socklen_t': '__u32',
         'pid_t':     '__kernel_pid_t',
@@ -168,41 +168,39 @@ def make_bindings(name, types, arg_names):
         'off_t':     '__s64',
         'loff_t':    '__s64',
         'time_t':    '__kernel_time64_t',
-        # 필요시 더 추가…
+        # 필요 시 추가…
     }
 
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
         parm = f"PT_REGS_PARM{idx}(ctx)"
-        # const 제거, 포인터 여부 및 기본 타입 분리
-        field_type = typ.replace('const', '').strip()
-        is_pointer = '*' in field_type
-        base_type = field_type.replace('*', '').strip()
+        core = typ.replace('const', '').replace('*', '').split('[')[0].strip()
+        is_array = '[' in typ
+        is_ptr   = '*' in typ
 
-        # 1) 포인터 타입 처리
-        if is_pointer:
-            if base_type == 'char':
-                # 문자열만 복사
-                lines.append(
-                    f"    bpf_probe_read_user_str(&e->data.{name}.{var}, "
-                    f"sizeof(e->data.{name}.{var}), (void*){parm});")
-            else:
-                # 모든 기타 포인터는 주소만 저장
-                lines.append(
-                    f"    e->data.{name}.{var}_ptr = (u64){parm};")
+        # 1) 배열, struct timeval/timespec, 또는 (char* 제외) 포인터
+        if is_array or core in ('struct timeval', 'struct timespec') or (is_ptr and core != 'char'):
+            lines.append(f"    e->data.{name}.{var}_ptr = (u64){parm};")
             continue
 
-        # 2) typedef 매핑이 있으면 그 타입으로 캐스트
-        if base_type in typedef_map:
-            ktype = typedef_map[base_type]
+        # 2) 문자열(char*) 포인터 → 사용자 공간에서 문자열 복사
+        if is_ptr and core == 'char':
             lines.append(
-                f"    e->data.{name}.{var} = ({ktype}){parm};")
+                f"    bpf_probe_read_user_str(&e->data.{name}.{var}, "
+                f"sizeof(e->data.{name}.{var}), (void*){parm});")
             continue
 
-        # 3) 기본 산술 타입 직접 대입
+        # 3) 일반 typedef → 매핑된 커널 타입으로 캐스트
+        if core in typedef_map:
+            ktype = typedef_map[core]
+            lines.append(f"    e->data.{name}.{var} = ({ktype}){parm};")
+            continue
+
+        # 4) 나머지 기본 타입 → 그대로 캐스트
         lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
 
     return "\n".join(lines)
+
 
 # --- .bpf.c 파일 생성 ---
 def generate_bpf_sources(syscalls, df):
@@ -492,8 +490,14 @@ def generate_common_event(df):
         
         fields = []
         for typ, var in zip(types, arg_names):
+            # --- 배열 인자 먼저 처리 ---
+            if '[' in typ:
+                # e.g. "struct timeval times[2]" → 주소만 저장
+                fields.append(f"    __u64 {var}_ptr;")
+                continue
+
             core = typ.replace('const', '').replace('*', '').strip()
-            is_ptr = '*' in typ
+            is_ptr = '*' in typ           
 
             # 1) 문자열 포인터 -> 고정배열
             if is_ptr and core == 'char':
