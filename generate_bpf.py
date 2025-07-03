@@ -12,6 +12,12 @@ BPF_DIR = 'bpf' # *.bpf.c 파일들이 저장될 디렉토리
 OUT_DIR = '.' # 최종 출력 디렉토리 (Makefile, monitor_loader.c)
 EVENT_HDR = 'include/common_event.h'
 
+# Known typedefs that are pointers to structs. Add more as needed.
+TYPEDEF_TO_UNDERLYING_TYPE = {
+    'cap_user_header_t': 'struct __user_cap_header',
+    'cap_user_data_t': 'struct __user_cap_data',
+}
+
 # alias_map: 필요 시 파생 syscall 이름 추가
 #alias_map = {
  #   'clone': ['clone', 'clone2', 'clone3'],
@@ -130,8 +136,8 @@ def make_bindings(name, types, arg_names):
                 lines.append(f"    bpf_probe_read_user_str(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
             else: # 기타 기본 타입 포인터 (int*, long* 등)
                 lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
-        # MODIFIED: typedef된 구조체 포인터 처리 (예: cap_user_header_t, cap_user_data_t)
-        elif re.search(r'\bcap_user_header_t\b|\bcap_user_data_t\b', typ):
+        # MODIFIED: typedef된 구조체 포인터 처리 (TYPEDEF_TO_UNDERLYING_TYPE에 정의된 경우)
+        elif typ in TYPEDEF_TO_UNDERLYING_TYPE:
             lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
         # 일반 타입 처리
         else:
@@ -432,18 +438,22 @@ def generate_common_event(df):
                 else: # Other pointers (assume char* for now, or basic types)
                     fields.append(f"    char {var}[MAX_STR_LEN];")
             else:
-                # IMPROVEMENT: Expanded mapping for kernel types
-                ktyp = {
-                    'int': '__s32', 'unsigned int': '__u32',
-                    'long': '__s64', 'unsigned long': '__u64',
-                    'size_t': '__u64', 'ssize_t': '__s64',
-                    'pid_t': '__s32', 'uid_t': '__u32', 'gid_t': '__u32',
-                    'mode_t': '__u32', 'umode_t': '__u16',
-                    'off_t': '__s64', 'loff_t': '__s64',
-                    'dev_t': '__u64', 'ino_t': '__u64',
-                    'time_t': '__s64', 'clockid_t': '__s32',
-                    'key_t': '__s32', 'qid_t': '__u32',
-                }.get(typ, typ) # Default to itself if not in map
+                # Handle known typedefs that are pointers to structs
+                if typ in TYPEDEF_TO_UNDERLYING_TYPE:
+                    ktyp = TYPEDEF_TO_UNDERLYING_TYPE[typ]
+                else:
+                    # IMPROVEMENT: Expanded mapping for kernel types
+                    ktyp = {
+                        'int': '__s32', 'unsigned int': '__u32',
+                        'long': '__s64', 'unsigned long': '__u64',
+                        'size_t': '__u64', 'ssize_t': '__s64',
+                        'pid_t': '__s32', 'uid_t': '__u32', 'gid_t': '__u32',
+                        'mode_t': '__u32', 'umode_t': '__u16',
+                        'off_t': '__s64', 'loff_t': '__s64',
+                        'dev_t': '__u64', 'ino_t': '__u64',
+                        'time_t': '__s64', 'clockid_t': '__s32',
+                        'key_t': '__s32', 'qid_t': '__u32',
+                    }.get(typ, typ) # Default to itself if not in map
                 fields.append(f"    {ktyp} {var};")
         
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
