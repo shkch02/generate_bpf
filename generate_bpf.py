@@ -484,7 +484,7 @@ def generate_common_event(df):
 
             # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
             mapping = {
-                'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h
+                'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
                 'id_t':       '__kernel_pid_t',
                 'nfds_t':     '__u32',
                 'caddr_t':    '__u64',
@@ -493,7 +493,7 @@ def generate_common_event(df):
                 'clockid_t':  '__kernel_clockid_t',
                 'timer_t':    '__kernel_timer_t',
                 'dev_t':      '__kernel_dev_t',
-                'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet
+                'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet, use u64
                 'mode_t':     'umode_t',
                 'uid_t':      '__kernel_uid32_t',
                 'gid_t':      '__kernel_gid32_t',
@@ -501,10 +501,10 @@ def generate_common_event(df):
                 'ssize_t':    '__kernel_ssize_t',
                 'loff_t':     '__kernel_loff_t',
                 'pid_t':      '__kernel_pid_t',
-                'sighandler_t': '__sighandler_t', # Added based on log
-                'idtype_t': '__s32', # Added based on log, typically an int
-                'enum __ptrace_request': '__s32', # Added based on log, typically an int
-                # 필요시 더 추가…
+                'sighandler_t': '__sighandler_t', # Corrected based on log
+                'idtype_t': '__s32', # Not found in vmlinux.h, use int
+                'enum __ptrace_request': '__s32', # Not found in vmlinux.h, use int
+                # Add other mappings as needed based on compilation errors
             }
             if core in mapping:
                 fields.append(f"    {mapping[core]} {var};")
@@ -515,11 +515,11 @@ def generate_common_event(df):
             btf_structs = {
                 'struct __user_cap_header',
                 'struct __user_cap_data',
-                'struct __kernel_timespec',
-                'struct __kernel_old_timeval',
+                'struct __kernel_timespec', # Corrected based on log
+                'struct __kernel_old_timeval', # Corrected based on log
                 'struct timex', # Assuming this exists, if not, it will error again.
                 'struct itimerval', # Assuming this exists, if not, it will error again.
-                # 필요시 더 추가…
+                # Add other BTF structs as needed
             }
             if core in btf_structs:
                 fields.append(f"    {core} {var};")
