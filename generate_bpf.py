@@ -30,8 +30,8 @@ TYPEDEF_TO_UNDERLYING_TYPE = {
 BPF_TEMPLATE = textwrap.dedent("""
 #define __TARGET_ARCH_x86
 #include <vmlinux.h>
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
+#include <bpf_helpers.h>
+#include <bpf_tracing.h>
 #include <linux/string.h>
 
 #include "common_maps.h"
