@@ -13,11 +13,10 @@ OUT_DIR = '.' # 최종 출력 디렉토리 (Makefile, monitor_loader.c)
 EVENT_HDR = 'include/common_event.h'
 
 # alias_map: 필요 시 파생 syscall 이름 추가
-alias_map = {
-    'clone': ['clone', 'clone2', 'clone3'],
-    'open':  ['open', 'openat', 'openat2'],
-    # 여기에 추가 파생 이름을 넣으면 자동 확장됨
-}
+#alias_map = {
+ #   'clone': ['clone', 'clone2', 'clone3'],
+ # 여기에 추가 파생 이름을 넣으면 자동 확장됨
+#}
 
 # --- eBPF 코드 템플릿 ---
 # BUGFIX: if(e) -> if(!e)
@@ -120,6 +119,7 @@ def make_bindings(name, types, arg_names):
     """ eBPF 코드에 삽입될 인자 바인딩 C 코드를 생성 """
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
+        print(f"DEBUG: Type: {typ}, Var: {var}")
         parm = f"PT_REGS_PARM{idx}(ctx)"
         # 포인터 타입 처리
         if '*' in typ:
@@ -132,6 +132,9 @@ def make_bindings(name, types, arg_names):
                 lines.append(f"    bpf_probe_read_user_str(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
             else: # 기타 기본 타입 포인터 (int*, long* 등)
                 lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
+        # MODIFIED: typedef된 구조체 포인터 처리 (예: cap_user_header_t, cap_user_data_t)
+        elif re.search(r'\bcap_user_header_t\b|\bcap_user_data_t\b', typ):
+            lines.append(f"    bpf_probe_read_user(&e->data.{name}.{var}, sizeof(e->data.{name}.{var}), (void*){parm});")
         # 일반 타입 처리
         else:
             lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
