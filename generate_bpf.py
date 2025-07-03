@@ -110,6 +110,9 @@ def get_proto(syscall):
         while name.startswith('*'):
             typ = typ + ' *'
             name = name[1:]
+        # If the original name token had array brackets, append them to the type.
+        if '[' in toks[-1]:
+            typ += toks[-1][toks[-1].find('['):] # Append [2] or whatever
 
         # If type is empty, it's a malformed entry, skip it.
         if not typ:
@@ -159,15 +162,29 @@ def make_bindings(name, types, arg_names):
     """ eBPF 코드에 삽입될 인자 바인딩 C 코드를 생성 """
     # 사용자-공간 typedef → 커널 BTF 매핑
     typedef_map = {
-        'socklen_t': '__u32',
-        'pid_t':     '__kernel_pid_t',
-        'uid_t':     '__kernel_uid32_t',
-        'gid_t':     '__kernel_gid32_t',
-        'size_t':    '__u64',
-        'ssize_t':   '__s64',
-        'off_t':     '__s64',
-        'loff_t':    '__s64',
-        'time_t':    '__kernel_time64_t',
+        'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
+        'id_t':       '__kernel_pid_t',
+        'struct timeval':  'struct __kernel_old_timeval',
+        'struct timespec': 'struct __kernel_timespec',
+        'enum __ptrace_request': '__s32',
+        'nfds_t':     '__u32',
+        'caddr_t':    '__u64',
+        'off64_t':    '__s64',
+        'time_t':     '__kernel_time64_t',
+        'clockid_t':  '__kernel_clockid_t',
+        'timer_t':    '__kernel_timer_t',
+        'dev_t':      '__kernel_dev_t',
+        'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet, use u64
+        'mode_t':     'umode_t',
+        'uid_t':      '__kernel_uid32_t',
+        'gid_t':      '__kernel_gid32_t',
+        'size_t':     '__kernel_size_t',
+        'ssize_t':    '__kernel_ssize_t',
+        'loff_t':     '__kernel_loff_t',
+        'pid_t':      '__kernel_pid_t',
+        'sighandler_t': '__sighandler_t', # Corrected based on log
+        'idtype_t': '__s32', # Not found in vmlinux.h, use int
+        'enum __ptrace_request': '__s32'
         # 필요 시 추가…
     }
 
@@ -179,7 +196,7 @@ def make_bindings(name, types, arg_names):
         is_ptr   = '*' in typ
 
         # 1) 배열, struct timeval/timespec, 또는 (char* 제외) 포인터
-        if is_array or core in ('struct timeval', 'struct timespec') or (is_ptr and core != 'char'):
+        if core in ('struct timeval','struct timespec') or is_array or (is_ptr and core != 'char'):
             lines.append(f"    e->data.{name}.{var}_ptr = (u64){parm};")
             continue
 
@@ -491,13 +508,14 @@ def generate_common_event(df):
         fields = []
         for typ, var in zip(types, arg_names):
             # --- 배열 인자 먼저 처리 ---
-            if '[' in typ:
-                # e.g. "struct timeval times[2]" → 주소만 저장
+            core   = typ.replace('const','').replace('*','').split('[')[0].strip()
+            is_ptr = '*' in typ
+            # --- 배열, timeval/timespec, 기타 포인터 먼저 처리 ---
+            core = typ.replace('const','').replace('*','').split('[')[0].strip()
+            is_ptr = '*' in typ
+            if '[' in typ or core in ('struct timeval','struct timespec') or (is_ptr and core != 'char'):
                 fields.append(f"    __u64 {var}_ptr;")
-                continue
-
-            core = typ.replace('const', '').replace('*', '').strip()
-            is_ptr = '*' in typ           
+                continue          
 
             # 1) 문자열 포인터 -> 고정배열
             if is_ptr and core == 'char':
@@ -505,16 +523,17 @@ def generate_common_event(df):
                 continue
             
             # 2) 기타 포인터 -> 주소만 저장
-            if is_ptr:
-                fields.append(f"    __u64 {var}_ptr;")
-                continue
+           # if is_ptr:
+           #     fields.append(f"    __u64 {var}_ptr;")
+           #     continue
 
             # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
             mapping = {
                 'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
                 'id_t':       '__kernel_pid_t',
-                'struct timeval':  'struct __kernel_old_timeval',
-                'struct timespec': 'struct __kernel_timespec',
+                #'struct timeval':  'struct __kernel_old_timeval',
+                #'struct timespec': 'struct __kernel_timespec',
+                'enum __ptrace_request': '__s32',
                 'nfds_t':     '__u32',
                 'caddr_t':    '__u64',
                 'off64_t':    '__s64',
