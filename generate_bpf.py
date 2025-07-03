@@ -118,7 +118,6 @@ def make_bindings(name, types, arg_names):
     """ eBPF 코드에 삽입될 인자 바인딩 C 코드를 생성 """
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
-        print(f"DEBUG: Type: {typ}, Var: {var}")
         parm = f"PT_REGS_PARM{idx}(ctx)"
         # 포인터 타입 처리
         if '*' in typ:
@@ -211,12 +210,11 @@ void sig_handler(int sig) {{
 }}
 
 // IMPROVEMENT: Kafka delivery report callback
-static void dr_msg_cb(rd_kafka_t *rk, const                
-            rd_kafka_message_t *rkmessage, void *opaque)               
-            {{{    if (rkmessage->err) {{                               
-           fprintf(stderr, "%% Message delivery failed:               
-            %%s\n", rd_kafka_err2str(rkmessage->err));                 
-            }}}}
+static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
+    if (rkmessage->err) {{
+        fprintf(stderr, "%% Message delivery failed: %%s\n", rd_kafka_err2str(rkmessage->err));
+    }}
+}}
 
 static void kafka_init() {{
     char errstr[512];
@@ -241,7 +239,7 @@ static void kafka_send(const char* buffer, size_t len) {{
     if (!buffer || len == 0) return;
     // RD_KAFKA_MSG_F_COPY makes a copy of the payload.
     rd_kafka_produce(rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, (void*)buffer, len, NULL, 0, NULL);
-    // Poll for delivery reports (and other events)
+    // Poll for delivery reports (and other events).
     rd_kafka_poll(rk, 0);
 }}
 
