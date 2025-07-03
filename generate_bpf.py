@@ -103,23 +103,28 @@ def get_proto(syscall):
         name = toks[-1]
         typ = " ".join(toks[:-1]).strip()
 
+        # Correctly handle pointer types where '*' is attached to the name
+        while name.startswith('*'):
+            typ = typ + ' *'
+            name = name[1:]
+
         # If type is empty, it's a malformed entry, skip it.
         if not typ:
             continue
 
         # Sanitize the name to be a valid C identifier
-        # Remove array brackets and leading asterisks for pointer notation
-        name = name.replace('[', '').replace(']', '').lstrip('*')
+        # Remove array brackets
+        name = name.replace('[', '').replace(']', '')
         # A more restrictive sanitizer to avoid creating invalid identifiers
         name = re.sub(r'[^a-zA-Z0-9_]', '', name)
         
         # If name is empty after sanitizing (e.g. from 'int *'), assign a generic one
         if not name or name in ['void']:
              name = f"arg{len(names)}"
-        
-        # Handle `const void *` -> becomes `const void` type, which is invalid for a field.
-        # We can't really handle `void *`, as we don't know what it points to or its size.
-        if typ.strip() == 'void' or typ.strip() == 'const void':
+
+        # We can't really handle `void`, as it's an incomplete type for a field.
+        # But `void *` is fine, and the logic above should handle it.
+        if typ.strip() == 'void':
             continue
 
         names.append(name)
@@ -445,6 +450,16 @@ def generate_common_event(df):
     }};
 """)
 
+    # 커널 타입 이름으로 변환하기 위한 맵
+    TYPE_MAP = {{
+        "struct timespec": "struct __kernel_timespec",
+        "struct timeval": "struct __kernel_old_timeval",
+        "socklen_t": "__kernel_socklen_t",
+        "struct timex": "struct timex",
+        "cap_user_header_t": "struct __user_cap_header",
+        "cap_user_data_t": "struct __user_cap_data",
+    }}
+
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
     
     unique_bases = df['syscall name'].unique()
@@ -459,25 +474,24 @@ def generate_common_event(df):
         
         fields = []
         for typ, var in zip(types, arg_names):
-            # Per user request, use type names directly, assuming vmlinux.h provides them.
-            # This removes explicit mapping to __s32 etc. and relies on the type
-            # from the man page being a valid C type in the compilation context.
-            
             field_type = typ.replace('const', '').strip()
+            
+            is_pointer = '*' in field_type
+            base_type = field_type.replace('*', '').strip()
+            
+            # 기본 타입을 커널 타입으로 변환
+            translated_base_type = TYPE_MAP.get(base_type, base_type)
 
-            if '*' in field_type:
-                # For string pointers, use a fixed-size char array.
-                if 'char' in field_type:
+            if is_pointer:
+                if 'char' in base_type:
                     fields.append(f"    char {var}[MAX_STR_LEN];")
-                # For other pointers (including struct pointers), we are reading the data
-                # into a field of the base type.
                 else:
-                    base_type = field_type.replace('*', '').strip()
-                    fields.append(f"    {base_type} {var};")
+                    # 다른 포인터 타입의 경우, 역참조된 값을 저장할 필드를 생성
+                    fields.append(f"    {translated_base_type} {var};")
             else:
-                # For non-pointer types, use the type directly.
-                fields.append(f"    {field_type} {var};")
-        
+                # 포인터가 아닌 타입
+                fields.append(f"    {translated_base_type} {var};")
+
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
         struct_lines.append(struct_code)
         union_lines.append(f"        struct {base}_event_t {base};")
