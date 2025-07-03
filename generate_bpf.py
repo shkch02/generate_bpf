@@ -29,6 +29,9 @@ TYPEDEF_TO_UNDERLYING_TYPE = {
 # BUGFIX: 컨테이너 런타임 필터링 로직을 명확하게 수정하고, 정의되지 않은 'flags' 변수 사용 제거
 BPF_TEMPLATE = textwrap.dedent("""
 #define __TARGET_ARCH_x86
+#ifndef PT_REGS_PARM6
+#define PT_REGS_PARM6(ctx) ((ctx)->r9)
+#endif
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
@@ -154,6 +157,20 @@ def get_syscall_info(row, syscall_name):
 # --- 인자 바인딩 생성 ---
 def make_bindings(name, types, arg_names):
     """ eBPF 코드에 삽입될 인자 바인딩 C 코드를 생성 """
+    # 사용자-공간 typedef 를 커널 BTF에 맞게 매핑
+    typedef_map = {
+        'socklen_t': '__u32',
+        'pid_t':     '__kernel_pid_t',
+        'uid_t':     '__kernel_uid32_t',
+        'gid_t':     '__kernel_gid32_t',
+        'size_t':    '__u64',
+        'ssize_t':   '__s64',
+        'off_t':     '__s64',
+        'loff_t':    '__s64',
+        'time_t':    '__kernel_time64_t',
+        # 필요시 더 추가…
+    }
+
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
         parm = f"PT_REGS_PARM{idx}(ctx)"
@@ -162,22 +179,30 @@ def make_bindings(name, types, arg_names):
         is_pointer = '*' in field_type
         base_type = field_type.replace('*', '').strip()
 
+        # 1) 포인터 타입 처리
         if is_pointer:
             if base_type == 'char':
-                # char *: 문자열만 복사
+                # 문자열만 복사
                 lines.append(
                     f"    bpf_probe_read_user_str(&e->data.{name}.{var}, "
                     f"sizeof(e->data.{name}.{var}), (void*){parm});")
             else:
-                # 그 외 모든 포인터: 주소를 _ptr 필드에 저장
+                # 모든 기타 포인터는 주소만 저장
                 lines.append(
                     f"    e->data.{name}.{var}_ptr = (u64){parm};")
-        else:
-            # 포인터가 아니면 직접 대입
-            lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
+            continue
+
+        # 2) typedef 매핑이 있으면 그 타입으로 캐스트
+        if base_type in typedef_map:
+            ktype = typedef_map[base_type]
+            lines.append(
+                f"    e->data.{name}.{var} = ({ktype}){parm};")
+            continue
+
+        # 3) 기본 산술 타입 직접 대입
+        lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
 
     return "\n".join(lines)
-
 
 # --- .bpf.c 파일 생성 ---
 def generate_bpf_sources(syscalls, df):
