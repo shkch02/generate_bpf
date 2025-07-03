@@ -42,14 +42,7 @@ BPF_TEMPLATE = textwrap.dedent("""
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
  static __attribute__((always_inline)) bool starts_with(const char *s, const char *prefix, __u32 n) {{
-      for ( __u32 i = 0; i < n; i++) {{}
-          if (s[i] != prefix[i]) return false;
-          if (s[i] == 0)       return false;
-      }}
-      return true;
-  }}
-static __attribute__((always_inline)) bool starts_with(const char *s, const char *prefix, __u32 n) {{
-      for ( __u32 i = 0; i < n; i++) {{}
+      for ( __u32 i = 0; i < n; i++) {{
           if (s[i] != prefix[i]) return false;
           if (s[i] == 0)       return false;
       }}
