@@ -62,31 +62,38 @@ int trace_{name}(struct pt_regs *ctx) {{
 
 # --- man 페이지에서 인자 이름 추출 ---
 def get_proto(syscall):
-    """ `man 2 syscall` 호출 후 SYNOPSIS에서 인자 이름만 추출 """
+    """ `man 2 syscall` 호출 후 SYNOPSIS에서 인자 타입과 이름을 추출 """
     try:
-        # EFFICIENCY: stderr=subprocess.PIPE is more robust than DEVNULL
         text = subprocess.check_output(['man', '2', syscall], text=True, stderr=subprocess.PIPE)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return []
-    # IMPROVEMENT: More robust regex to handle different man page formats
+        return [], [] # Return empty types and names
+    
     m = re.search(r'SYNOPSIS.*?' + re.escape(syscall) + r'\s*\(([^)]*)\)', text, re.DOTALL)
     if not m:
-        return []
+        return [], [] # Return empty types and names
     
     parts = [p.strip() for p in m.group(1).split(',')]
+    types = []
     names = []
     for p in parts:
-        # Handle "void" and other non-argument cases
         if p.lower().strip() == 'void':
             continue
-        # The argument name is usually the last word
+        
         toks = p.split()
-        if toks:
-            name = toks[-1]
-            # Remove potential array brackets or pointer asterisks from the name
-            name = name.replace('[', '').replace(']', '').lstrip('*')
-            names.append(name)
-    return names
+        if not toks:
+            continue
+            
+        # The argument name is usually the last word
+        name = toks[-1]
+        # Remove potential array brackets or pointer asterisks from the name
+        name = name.replace('[', '').replace(']', '').lstrip('*')
+        names.append(name)
+        
+        # Everything before the last word is the type
+        typ = " ".join(toks[:-1]).strip()
+        types.append(typ)
+        
+    return types, names
 
 # --- CSV 파싱 및 alias 확장 ---
 def parse_csv():
@@ -104,29 +111,8 @@ def parse_csv():
 
 # --- REFACTOR: 중복 로직을 헬퍼 함수로 추출 ---
 def get_syscall_info(row, syscall_name):
-    """ 주어진 syscall에 대한 타입과 인자 이름 목록을 반환 """
-    types = []
-    # BUGFIX: x86_64 레지스터 순서(rdi, rsi, rdx, r10, r8, r9)를 정확히 매핑
-    regs = ['di', 'si', 'dx', '10', '8', '9']
-    for i in range(6):
-        col = f'arg{i}(%r{regs[i]})'
-        # BUGFIX: `row[col] = '-'` 를 `row[col] != '-'` 로 수정
-        if col in row and isinstance(row[col], str) and row[col] != '-':
-            # 타입 정보만 추출 (e.g., 'const char *' -> 'const char*')
-            types.append(" ".join(row[col].split()))
-
-    # man 페이지에서 인자 이름 가져오기, 실패 시 기본값 사용
-    arg_names = get_proto(syscall_name)
-    # 인자 이름의 개수가 타입 개수와 다를 경우, 기본값으로 대체
-    if len(arg_names) != len(types):
-        # DEBUG: Print detailed info before warning
-        print(f"\n[Debug] Mismatch for syscall: '{syscall_name}'")
-        print(f"  - Types from CSV (count: {len(types)}): {types}")
-        print(f"  - Names from man page (count: {len(arg_names)}): {arg_names}")
-        # IMPROVEMENT: More informative log message
-        print(f"[Warning] Failed to get arg names for \"{syscall_name}\" from man page. Using default names (arg0, arg1, ...).")
-        arg_names = [f"arg{i}" for i in range(len(types))]
-
+    """ 주어진 syscall에 대한 타입과 인자 이름 목록을 man 페이지에서 직접 추출 """
+    types, arg_names = get_proto(syscall_name)
     return types, arg_names
 
 # --- 인자 바인딩 생성 ---
@@ -441,7 +427,7 @@ def generate_common_event(df):
                     fields.append(f"    char {var}[MAX_STR_LEN];")
             else:
                 # IMPROVEMENT: Expanded mapping for kernel types
-                ktyp = {{
+                ktyp = {
                     'int': '__s32', 'unsigned int': '__u32',
                     'long': '__s64', 'unsigned long': '__u64',
                     'size_t': '__u64', 'ssize_t': '__s64',
@@ -451,7 +437,7 @@ def generate_common_event(df):
                     'dev_t': '__u64', 'ino_t': '__u64',
                     'time_t': '__s64', 'clockid_t': '__s32',
                     'key_t': '__s32', 'qid_t': '__u32',
-                }}.get(typ, typ) # Default to itself if not in map
+                }.get(typ, typ) # Default to itself if not in map
                 fields.append(f"    {ktyp} {var};")
         
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
