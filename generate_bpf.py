@@ -382,7 +382,14 @@ def generate_common_event(df):
     """ eBPF와 로더가 공용으로 사용하는 헤더 파일(common_event.h)을 생성 """
     HEADER = textwrap.dedent("""
     #pragma once
-    #include <linux/types.h>
+    #include <linux/timex.h>
+    #include <linux/capability.h>
+    #include <linux/time.h>
+    #include <linux/socket.h>
+    #include <linux/in.h>
+    #include <linux/in6.h>
+    #include <linux/un.h>
+    #include <linux/net.h>
 
     // IMPROVEMENT: Increased max string length for paths, etc.
     // This is a hard limit; longer strings will be truncated.
@@ -457,6 +464,9 @@ def generate_common_event(df):
                         'dev_t': '__u64', 'ino_t': '__u64',
                         'time_t': '__s64', 'clockid_t': '__s32',
                         'key_t': '__s32', 'qid_t': '__u32',
+                        'socklen_t': '__u32', # Map socklen_t to __u32
+                        'void': '__u64', # Map void to __u64 (for pointers)
+                        'const void': '__u64', # Map const void to __u64 (for pointers)
                     }.get(typ, typ) # Default to itself if not in map
                 fields.append(f"    {ktyp} {var};")
         
