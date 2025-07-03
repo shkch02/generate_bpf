@@ -41,13 +41,21 @@ BPF_TEMPLATE = textwrap.dedent("""
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
-static __attribute__((always_inline)) bool starts_with(const char *s, const char *prefix, __u32 n) {{
-      for ( __u32 i = 0; i < n; i++) {
+ static __attribute__((always_inline)) bool starts_with(const char *s, const char *prefix, __u32 n) {{
+      for ( __u32 i = 0; i < n; i++) {{}
           if (s[i] != prefix[i]) return false;
           if (s[i] == 0)       return false;
-      }
+      }}
       return true;
-  }}                               
+  }}
+static __attribute__((always_inline)) bool starts_with(const char *s, const char *prefix, __u32 n) {{
+      for ( __u32 i = 0; i < n; i++) {{}
+          if (s[i] != prefix[i]) return false;
+          if (s[i] == 0)       return false;
+      }}
+      return true;
+  }}
+                               
 
 SEC("kprobe/__x64_sys_{name}")
 int trace_{name}(struct pt_regs *ctx) {{
@@ -58,7 +66,7 @@ int trace_{name}(struct pt_regs *ctx) {{
   if (!starts_with(comm, "runc", 4) &&
         !starts_with(comm, "conmon", 6) &&
         !starts_with(comm, "containerd-shim", 15) &&
-        !starts_with(comm, "docker", 6)) {{}
+        !starts_with(comm, "docker", 6)) {{
         return 0;
     }}
 
@@ -271,7 +279,7 @@ all: $(OBJECTS) $(SKELETONS)
 	$(BPFTOOL) gen skeleton $< > $@
 
 clean:
-	rm -f bpf/*.bpf.o *.skel.h monitor_loader
+	rm -f *.bpf.o *.skel.h monitor_loader
 """)
 
 def generate_makefile(targets):
