@@ -174,11 +174,11 @@ KERNEL_SRCDIR ?= /usr/src/linux-headers-$(shell uname -r)
 CFLAGS := \
     -O2 -g -Wall -Werror \
     -target bpf \
-    -nostdinc                                 \  # 호스트표준헤더 무시
-    -isystem $(LLVM_SYSROOT)/include          \  # Clang 내장 헤더
-    -isystem $(LLVM_SYSROOT)/../lib/clang/*/include \  # Clang builtin 헤더
-    -isystem $(KERNEL_SRCDIR)/include/uapi     \  # 커널 UAPI 헤더
-    -Iinclude                                 \  # common_*.h
+    -nostdinc                                 \
+    -isystem $(LLVM_SYSROOT)/include          \
+    -isystem $(LLVM_SYSROOT)/../lib/clang/*/include \
+    -isystem $(KERNEL_SRCDIR)/include/uapi     \
+    -Iinclude                                 \
     -I.                                       \
     -I$(KERNEL_SRCDIR)/tools/lib/bpf/include    # libbpf helper 헤더
                            
