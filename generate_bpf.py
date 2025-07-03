@@ -455,27 +455,6 @@ def generate_common_event(df):
     }};
 """)
 
-    # 유저랜드 타입을 커널 vmlinux.h 타입으로 변환하기 위한 맵
-    TYPE_MAP = {{
-        "socklen_t": "__kernel_socklen_t",
-        "pid_t": "__kernel_pid_t",
-        "uid_t": "__kernel_uid32_t",
-        "gid_t": "__kernel_gid32_t",
-        "size_t": "__kernel_size_t",
-        "ssize_t": "__kernel_ssize_t",
-        "loff_t": "__kernel_loff_t",
-        "time_t": "__kernel_time64_t",
-        "dev_t": "__kernel_dev_t",
-        "ino_t": "u64",
-        "mode_t": "umode_t",
-        "struct timespec": "struct __kernel_timespec",
-        "struct timeval": "struct __kernel_old_timeval",
-        "struct timex": "struct timex",
-        "cap_user_header_t": "struct __user_cap_header",
-        "cap_user_data_t": "struct __user_cap_data",
-        # Add other mappings as needed based on compilation errors
-    }}
-
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
     
     unique_bases = df['syscall name'].unique()
@@ -490,36 +469,80 @@ def generate_common_event(df):
         
         fields = []
         for typ, var in zip(types, arg_names):
-            field_type = typ.replace('const', '').strip()
-            is_pointer = '*' in field_type
-            base_type = field_type.replace('*', '').strip()
+            core = typ.replace('const', '').replace('*', '').strip()
+            is_ptr = '*' in typ
 
-            if base_type == 'void':
-                if is_pointer:
-                    # For `void *`, we can't know the size to read. Store as a pointer.
-                    fields.append(f"    __u64 {var}_ptr;")
-                else:
-                    # `void` type for a field is invalid. Skip.
-                    continue
-            elif is_pointer and 'char' in base_type:
-                # Special handling for strings
+            # 1) 문자열 포인터 -> 고정배열
+            if is_ptr and core == 'char':
                 fields.append(f"    char {var}[MAX_STR_LEN];")
-            else:
-                # For all other types, define a field for the data itself.
-                # The BPF code will be responsible for populating it.
-                # Translate the base type to its kernel equivalent.
-                final_type = TYPE_MAP.get(base_type, base_type)
-                fields.append(f"    {final_type} {var};")
+                continue
+            
+            # 2) 기타 포인터 -> 주소만 저장
+            if is_ptr:
+                fields.append(f"    __u64 {var}_ptr;")
+                continue
+
+            # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
+            mapping = {
+                'socklen_t': '__kernel_socklen_t',
+                'id_t':       '__kernel_pid_t', # 또는 __u32
+                'nfds_t':     '__u32',
+                'caddr_t':    '__u64',
+                'off64_t':    '__s64',
+                'time_t':     '__kernel_time64_t',
+                'clockid_t':  '__kernel_clockid_t',
+                'timer_t':    '__kernel_timer_t',
+                'dev_t':      '__kernel_dev_t',
+                'ino_t':      '__kernel_ino_t', # vmlinux.h에 정의되어 있다면
+                'mode_t':     'umode_t',
+                'uid_t':      '__kernel_uid32_t',
+                'gid_t':      '__kernel_gid32_t',
+                'size_t':     '__kernel_size_t',
+                'ssize_t':    '__kernel_ssize_t',
+                'loff_t':     '__kernel_loff_t',
+                'pid_t':      '__kernel_pid_t',
+                # 필요시 더 추가…
+            }
+            if core in mapping:
+                fields.append(f"    {mapping[core]} {var};")
+                continue
+
+            # 4) 커널 BTF에 정의된 구조체 이름은 그대로 사용
+            # vmlinux.h에서 직접 찾아서 추가해야 합니다.
+            btf_structs = {
+                'struct __user_cap_header',
+                'struct __user_cap_data',
+                'struct __kernel_timespec',
+                'struct __kernel_old_timeval',
+                'struct timex',
+                'struct itimerval',
+                # 필요시 더 추가…
+            }
+            if core in btf_structs:
+                fields.append(f"    {core} {var};")
+                continue
+
+            # 5) 그 외 기본 산술 타입 -> __s32/__u32 등으로 매핑
+            basic_map = {
+                'int':'__s32','unsigned int':'__u32',
+                'long':'__s64','unsigned long':'__u64',
+                'short':'__s16','unsigned short':'__u16',
+                'char':'__s8','unsigned char':'__u8',
+                'bool':'_Bool',
+                # pid_t, uid_t 등은 위 typedef 매핑에서 처리
+            }
+            ktyp = basic_map.get(core, core)
+            fields.append(f"    {ktyp} {var};")
         
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
         struct_lines.append(struct_code)
         union_lines.append(f"        struct {base}_event_t {base};")
 
     content = HEADER.format(
-        enum_entries='\n'.join(enum_lines),
-        enum_strings='\n'.join(enum_strings),
-        struct_definitions='\n'.join(struct_lines),
-        union_entries='\n'.join(union_lines)
+        enum_entries="\n".join(enum_lines),
+        enum_strings="\n".join(enum_strings),
+        struct_definitions="\n".join(struct_lines),
+        union_entries="\n".join(union_lines)
     )
     os.makedirs(os.path.dirname(EVENT_HDR), exist_ok=True)
     with open(EVENT_HDR, 'w') as f:
