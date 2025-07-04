@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 #해당 코드는 ubuntutu 22.04 LTS에서 실행됨
+
+#디렉토리 정리 필요
+#project/
+#├─ bpf/
+#│  ├─ foo.bpf.c
+#│  └─ common_event_bpf.h     ← vmlinux.h 포함
+#├─ user/
+#│  ├─ monitor_loader.c
+#│  └─ common_event_user.h    ← vmlinux.h 없는 순수 구조체 정의
+#└─ Makefile
 import os
 import subprocess
 import re
@@ -11,6 +21,7 @@ CSV_PATH = 'syscalls_x86_64.csv'
 BPF_DIR = 'bpf' # *.bpf.c 파일들이 저장될 디렉토리
 OUT_DIR = '.' # 최종 출력 디렉토리 (Makefile, monitor_loader.c)
 EVENT_HDR = 'include/common_event.h'
+EVENT_HDR_USER = 'include/common_event_user.h'
 
 # Known typedefs that are pointers to structs. Add more as needed.
 TYPEDEF_TO_UNDERLYING_TYPE = {
@@ -269,26 +280,26 @@ CFLAGS := -O2 -g -Wall -Werror -target bpf -nostdinc -isystem /usr/include -isys
                            
 # 모든 bpf 오브젝트와 스켈레톤 헤더를 빌드
 TARGETS := {targets}
-OBJECTS := $(addsuffix _monitor.bpf.o, $(TARGETS))
-SKELETONS := $(addsuffix _monitor.skel.h, $(TARGETS))
+OBJECTS := $(addprefix bpf/,$(addsuffix _monitor.bpf.o, $(TARGETS)))
+SKELETONS := $(addprefix bpf/,$(addsuffix _monitor.skel.h, $(TARGETS)))
 
 all: $(OBJECTS) $(SKELETONS) monitor_loader
                           
 # 패턴 규칙: _name_monitor.bpf.c -> _name_monitor.bpf.o
-%_monitor.bpf.o: bpf/%_monitor.bpf.c include/common_event.h
-	$(CC) $(CFLAGS) -c $< -o $@
+bpf/%_monitor.bpf.o: bpf/%_monitor.bpf.c include/common_event.h
+	$(CC) $(CFLAGS) -Iinclude -c $< -o $@
 
 # 패턴 규칙: .bpf.o -> .skel.h
-%_monitor.skel.h: %_monitor.bpf.o
+bpf/%_monitor.skel.h: bpf/%_monitor.bpf.o
 	$(BPFTOOL) gen skeleton $< > $@
 
 monitor_loader: monitor_loader.c
-    gcc -o $@ $< \
-    -Iinclude \
-    -I. \
-    -I$(LLVM_SYSROOT)/include \
-    -I$(KERNEL_SRCDIR)/tools/lib/bpf/include \
-    -lbpf -lrdkafka -lpthread
+	gcc -o $@ $< \
+	-Iinclude \
+	-I. \
+	-I$(LLVM_SYSROOT)/include \
+	-I$(KERNEL_SRCDIR)/tools/lib/bpf/include \
+	-lbpf -lrdkafka -lpthread
 
 clean:
 	rm -f *.bpf.o *.skel.h monitor_loader
@@ -311,8 +322,9 @@ LOADER_TEMPLATE = textwrap.dedent("""
 #include <unistd.h>
 #include <bpf/libbpf.h>
 #include <librdkafka/rdkafka.h>
-#include "include/common_event.h"
-{includes} bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
+#include "include/common_event_user.h"
+{includes} 
+// bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 
 static volatile bool running = true;
 static rd_kafka_t *rk;
@@ -329,7 +341,7 @@ void sig_handler(int sig) {{
 // IMPROVEMENT: Kafka delivery report callback
 static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
     if (rkmessage->err) {{
-        fprintf(stderr, "%% Message delivery failed: %%s\n", rd_kafka_err2str(rkmessage->err));
+        fprintf(stderr, "%% Message delivery failed: %%s\\n", rd_kafka_err2str(rkmessage->err));
     }}
 }}
 
@@ -338,7 +350,7 @@ static void kafka_init() {{
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
 
     if (rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092", errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
-        fprintf(stderr, "%% %%s\n", errstr);
+        fprintf(stderr, "%% %%s\\n", errstr);
         exit(1);
     }}
     // Set delivery report callback
@@ -346,7 +358,7 @@ static void kafka_init() {{
 
     rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
     if (!rk) {{
-        fprintf(stderr, "%% Failed to create new producer: %%s\n", errstr);
+        fprintf(stderr, "%% Failed to create new producer: %%s\\n", errstr);
         exit(1);
     }}
     rkt = rd_kafka_topic_new(rk, "syscall_events", NULL);
@@ -400,14 +412,14 @@ int main() {{
     int map_fd = bpf_map__fd({first}_skel->maps.events);
     struct ring_buffer *rb = ring_buffer__new(map_fd, on_event, NULL, NULL);
     if (!rb) {{
-        fprintf(stderr, "Failed to create ring buffer\n");
+        fprintf(stderr, "Failed to create ring buffer\\n");
         goto cleanup;
     }}
 
-    printf("Monitoring syscalls... Press Ctrl+C to exit.\n\n");
+    printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
     while (running) {{
         if (ring_buffer__poll(rb, 100) < 0) {{
-            fprintf(stderr, "Error polling ring buffer\n");
+            fprintf(stderr, "Error polling ring buffer\\n");
             break;
         }}
         // Poll Kafka regularly to serve delivery reports and other callbacks.
@@ -417,11 +429,11 @@ int main() {{
 cleanup:
     ring_buffer__free(rb);
     {destroys}
-    fprintf(stderr, "\nFlushing final Kafka messages...\n");
+    fprintf(stderr, "\\nFlushing final Kafka messages...\\n");
     rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
     rd_kafka_topic_destroy(rkt);
     rd_kafka_destroy(rk);
-    printf("Cleaned up resources.\n");
+    printf("Cleaned up resources.\\n");
     return 0;
 }}
 """)
@@ -464,11 +476,11 @@ def generate_loader(targets, df):
         attaches.append(textwrap.dedent(f"""
     {alias}_skel = {alias}_monitor_bpf__open_and_load();
     if (!{alias}_skel) {{
-        fprintf(stderr, "Failed to open and load {alias} skeleton\n");
+        fprintf(stderr, "Failed to open and load {alias} skeleton\\n");
         goto cleanup;
     }}
     if ({alias}_monitor_bpf__attach({alias}_skel) != 0) {{
-        fprintf(stderr, "Failed to attach {alias} skeleton\n");
+        fprintf(stderr, "Failed to attach {alias} skeleton\\n");
         goto cleanup;
     }}"""))
         destroys.append(f"    if ({alias}_skel) {alias}_monitor_bpf__destroy({alias}_skel);")
@@ -489,7 +501,7 @@ def generate_loader(targets, df):
 
 # --- common_event.h 생성 ---
 def generate_common_event(df):
-    """ eBPF와 로더가 공용으로 사용하는 헤더 파일(common_event.h)을 생성 """
+    """ eBPF가 사용하는 헤더 파일(common_event.h)을 생성 """
     HEADER = textwrap.dedent("""
     #pragma once
 #include <vmlinux.h>
@@ -632,6 +644,220 @@ def generate_common_event(df):
         f.write(content)
     print(f"Generated {EVENT_HDR}")
 
+def generate_common_event_user(df):
+    """ 로더가 사용하는 헤더 파일(common_event_user.h)을 생성 """
+    HEADER = textwrap.dedent("""
+#pragma once
+
+/* 1) 필수 헤더 */
+#include <stdint.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <linux/keyctl.h>
+#include <sys/capability.h>
+#include <aio.h>
+#include <mqueue.h>
+
+/* 2) 축약형 정수 타입 */
+typedef uint64_t u64;
+typedef uint32_t u32;
+typedef uint16_t u16;
+typedef uint8_t  u8;
+typedef  int64_t s64;
+typedef  int32_t s32;
+typedef  int16_t s16;
+typedef   int8_t s8;
+
+/* 3) uapi 헤더에 없는, 커널 전용 타입 매핑 */
+/*    이미 정의된 표준 타입은 건드리지 않습니다. */
+#ifndef umode_t
+typedef mode_t             umode_t;           /* 파일 모드 */
+#endif
+
+#ifndef __kernel_dev_t
+typedef dev_t              __kernel_dev_t;    /* 커널 dev_t */
+#endif
+
+#ifndef __kernel_loff_t
+typedef long long          __kernel_loff_t;
+#endif
+
+#ifndef __kernel_time64_t
+typedef long long          __kernel_time64_t;
+#endif
+
+#ifndef __kernel_clockid_t
+typedef int                __kernel_clockid_t;
+#endif
+
+#ifndef __kernel_timer_t
+typedef int                __kernel_timer_t;
+#endif
+
+#ifndef __kernel_uid32_t
+typedef uid_t              __kernel_uid32_t;
+#endif
+
+#ifndef __kernel_gid32_t
+typedef gid_t              __kernel_gid32_t;
+#endif
+
+#ifndef __kernel_size_t
+typedef size_t             __kernel_size_t;
+#endif
+
+#ifndef __kernel_ssize_t
+typedef ssize_t            __kernel_ssize_t;
+#endif
+
+#ifndef __kernel_pid_t
+typedef pid_t              __kernel_pid_t;
+#endif
+
+#ifndef key_serial_t
+typedef int                key_serial_t;
+#endif
+
+#ifndef aio_context_t
+typedef unsigned long      aio_context_t;
+#endif
+   
+                    
+                             
+    // IMPROVEMENT: Increased max string length for paths, etc.
+    // This is a hard limit; longer strings will be truncated.
+    #define MAX_STR_LEN 1024
+
+    enum event_type {{
+    {enum_entries}
+        EVT_MAX,
+    }};
+
+    
+    {struct_definitions}
+
+    struct event_t {{
+        __u32 pid;
+        enum event_type type;
+        __u64 ts_ns;
+        union {{
+    {union_entries}
+        }} data;
+    }};
+    """)
+    
+    STRUCT_TMPL = textwrap.dedent("""
+    struct {name}_event_t {{
+    {fields}
+    }};
+""")
+
+    enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
+    
+    unique_bases = df['syscall name'].unique()
+
+    for base in unique_bases:
+        upper_base = base.upper()
+        enum_lines.append(f"    EVT_{upper_base},")
+        enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
+
+        row = df[df['syscall name'] == base].iloc[0]
+        types, arg_names = get_syscall_info(row, base)
+        
+        fields = []
+        for typ, var in zip(types, arg_names):
+            # --- 배열 인자 먼저 처리 ---
+            core   = typ.replace('const','').replace('*','').split('[')[0].strip()
+            is_ptr = '*' in typ
+            # --- 배열, timeval/timespec, 기타 포인터 먼저 처리 ---
+            core = typ.replace('const','').replace('*','').split('[')[0].strip()
+            is_ptr = '*' in typ
+            if '[' in typ or core in ('struct timeval','struct timespec') or (is_ptr and core != 'char'):
+                fields.append(f"    __u64 {var}_ptr;")
+                continue          
+
+            # 1) 문자열 포인터 -> 고정배열
+            if is_ptr and core == 'char':
+                fields.append(f"    char {var}[MAX_STR_LEN];")
+                continue
+            
+            # 2) 기타 포인터 -> 주소만 저장
+           # if is_ptr:
+           #     fields.append(f"    __u64 {var}_ptr;")
+           #     continue
+
+            # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
+            mapping = {
+                'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
+                'id_t':       '__kernel_pid_t',
+                #'struct timeval':  'struct __kernel_old_timeval',
+                #'struct timespec': 'struct __kernel_timespec',
+                'enum __ptrace_request': '__s32',
+                'nfds_t':     '__u32',
+                'caddr_t':    '__u64',
+                'off64_t':    '__s64',
+                'time_t':     '__kernel_time64_t',
+                'clockid_t':  '__kernel_clockid_t',
+                'timer_t':    '__kernel_timer_t',
+                'dev_t':      '__kernel_dev_t',
+                'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet, use u64
+                'mode_t':     'umode_t',
+                'uid_t':      '__kernel_uid32_t',
+                'gid_t':      '__kernel_gid32_t',
+                'size_t':     '__kernel_size_t',
+                'ssize_t':    '__kernel_ssize_t',
+                'loff_t':     '__kernel_loff_t',
+                'pid_t':      '__kernel_pid_t',
+                'sighandler_t': '__sighandler_t', # Corrected based on log
+                'idtype_t': '__s32', # Not found in vmlinux.h, use int
+                'enum __ptrace_request': '__s32', # Not found in vmlinux.h, use int
+                # Add other mappings as needed based on compilation errors
+            }
+            if core in mapping:
+                fields.append(f"    {mapping[core]} {var};")
+                continue
+
+            # 4) 커널 BTF에 정의된 구조체 이름은 그대로 사용
+            # vmlinux.h에서 직접 찾아서 추가해야 합니다.
+            btf_structs = {
+                'struct __user_cap_header',
+                'struct __user_cap_data',
+                'struct __kernel_timespec', # Corrected based on log
+                'struct __kernel_old_timeval', # Corrected based on log
+                'struct timex', # Assuming this exists, if not, it will error again.
+                'struct itimerval', # Assuming this exists, if not, it will error again.
+                # Add other BTF structs as needed
+            }
+            if core in btf_structs:
+                fields.append(f"    {core} {var};")
+                continue
+
+            # 5) 그 외 기본 산술 타입 -> __s32/__u32 등으로 매핑
+            basic_map = {
+                'int':'__s32','unsigned int':'__u32',
+                'long':'__s64','unsigned long':'__u64',
+                'short':'__s16','unsigned short':'__u16',
+                'char':'__s8','unsigned char':'__u8',
+                'bool':'_Bool',
+                # pid_t, uid_t 등은 위 typedef 매핑에서 처리
+            }
+            ktyp = basic_map.get(core, core)
+            fields.append(f"    {ktyp} {var};")
+        
+        struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
+        struct_lines.append(struct_code)
+        union_lines.append(f"        struct {base}_event_t {base};")
+
+    content = HEADER.format(
+        enum_entries="\n".join(enum_lines),
+        enum_strings="\n".join(enum_strings),
+        struct_definitions="\n".join(struct_lines),
+        union_entries="\n".join(union_lines)
+    )
+    os.makedirs(os.path.dirname(EVENT_HDR_USER), exist_ok=True)
+    with open(EVENT_HDR_USER, 'w') as f:
+        f.write(content)
+    print(f"Generated {EVENT_HDR_USER}")
 
 # --- main ---
 def main():
@@ -640,13 +866,16 @@ def main():
     # alias 목록
     targets = sorted([alias for alias, _ in syscalls])
     
-    # 1. 공통 헤더 파일 생성
+    # 1. bpf 헤더 파일 생성
     generate_common_event(df);
+
+    # 2. 사용자 공간 헤더 파일 생성
+    generate_common_event_user(df);
     
-    # 2. BPF 소스 파일들 생성
+    # 3. BPF 소스 파일들 생성
     generate_bpf_sources(syscalls, df);
     
-    # 3. Makefile 및 로더 생성
+    # 4. Makefile 및 로더 생성
     generate_makefile(targets);
     generate_loader(targets, df);
     
