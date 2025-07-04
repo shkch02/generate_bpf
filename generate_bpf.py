@@ -453,22 +453,47 @@ def generate_loader(targets, df):
         types, arg_names = get_syscall_info(row, base)
 
         for typ, var in zip(types, arg_names):
-            # IMPROVEMENT: Correctly format different types for JSON
-            if '*' in typ:
-                if 'struct' in typ:
-                    # For structs, we can't easily serialize to JSON without more info.
-                    # We'll just indicate its presence.
-                    case_str += f'            fprintf(f, ",\\"{var}\\":\\"<struct>\\"");\n' #07041251 \n -> \\n바꿨음 안됨 \n임자음
-                else: # char*
-                    case_str += f'            fprintf(f, ",\\"{var}\\":\\"%%s\\"", e->data.{base}.{var});\n'
+        # 1) 포인터(배열·struct·기타 포인터)인 경우
+            if '[' in typ or ('*' in typ and 'char' not in typ):
+        # 실제 멤버 이름은 var + "_ptr"
+                case_str += (
+                   f'            fprintf(f, ",\\"{var}\\":%llu", '
+                    f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
+                )
+                continue
+
+    # 2) 문자열(char*)인 경우
+            elif '*' in typ and 'char' in typ:
+                case_str += (
+                    f'            fprintf(f, ",\\"{var}\\":\\"%s\\"", '
+                    f'e->data.{base}.{var});\n'
+                )
+                continue
+
+    # 3) long 계열
             elif typ in ['long', 'ssize_t', 'off_t', 'loff_t', 'time_t']:
-                case_str += f'            fprintf(f, ",\\"{var}\\":%lld", (long long)e->data.{base}.{var});\n'
+                case_str += (
+                    f'            fprintf(f, ",\\"{var}\\":%lld", '
+                    f'(long long)e->data.{base}.{var});\n'
+                )
+
+    # 4) unsigned long 계열
             elif typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']:
-                case_str += f'            fprintf(f, ",\\"{var}\\":%llu", (unsigned long long)e->data.{base}.{var});\n'
-            else: # int, pid_t, uid_t, etc.
-                case_str += f'            fprintf(f, ",\\"{var}\\":%d", e->data.{base}.{var});\n'
-        case_str += "            break;"
-        event_cases.append(case_str)
+               case_str += (
+                   f'            fprintf(f, ",\\"{var}\\":%llu", '
+                   f'(unsigned long long)e->data.{base}.{var});\n'
+               )
+
+    # 5) 나머지 정수형
+            else:
+               case_str += (
+                   f'            fprintf(f, ",\\"{var}\\":%d", '
+                   f'e->data.{base}.{var});\n'
+               )
+
+    # 각 case 의 마지막에는 반드시 break
+    case_str += "            break;\n"
+    event_cases.append(case_str)
 
     for alias in targets:
         includes.append(f'#include "bpf/{alias}_monitor.skel.h"')
