@@ -341,7 +341,7 @@ void sig_handler(int sig) {{
 // IMPROVEMENT: Kafka delivery report callback
 static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
     if (rkmessage->err) {{
-        fprintf(stderr, "%% Message delivery failed: %%s\\n", rd_kafka_err2str(rkmessage->err));
+        fprintf(stderr, " Message delivery failed: %s\\n", rd_kafka_err2str(rkmessage->err));
     }}
 }}
 
@@ -350,7 +350,7 @@ static void kafka_init() {{
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
 
     if (rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092", errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
-        fprintf(stderr, "%% %%s\\n", errstr);
+        fprintf(stderr, "%s\\n", errstr);
         exit(1);
     }}
     // Set delivery report callback
@@ -358,7 +358,7 @@ static void kafka_init() {{
 
     rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
     if (!rk) {{
-        fprintf(stderr, "%% Failed to create new producer: %%s\\n", errstr);
+        fprintf(stderr, "Failed to create new producer: %s\\n", errstr);
         exit(1);
     }}
     rkt = rd_kafka_topic_new(rk, "syscall_events", NULL);
@@ -379,7 +379,7 @@ static void serialize_and_send(const struct event_t *e) {{
     FILE *f = open_memstream(&buf, &size);
     if (!f) return;
 
-    fprintf(f, "{{\"type\":\"%%s\",\"pid\":%%u,\"ts\":%%llu", event_type_str[e->type], e->pid, e->ts_ns);
+    fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu", event_type_str[e->type], e->pid, e->ts_ns);
 
     // Event-specific data
     switch (e->type) {{
@@ -458,15 +458,15 @@ def generate_loader(targets, df):
                 if 'struct' in typ:
                     # For structs, we can't easily serialize to JSON without more info.
                     # We'll just indicate its presence.
-                    case_str += f'            fprintf(f, ",\"{var}\":\"<struct>\"");\n'
+                    case_str += f'            fprintf(f, ",\\"{var}\\":\\"<struct>\\"");\n' #07041251 \n -> \\n바꿨음 안됨 \n임자음
                 else: # char*
-                    case_str += f'            fprintf(f, ",\"{var}\":\"%%s\"", e->data.{base}.{var});\n'
+                    case_str += f'            fprintf(f, ",\\"{var}\\":\\"%%s\\"", e->data.{base}.{var});\n'
             elif typ in ['long', 'ssize_t', 'off_t', 'loff_t', 'time_t']:
-                case_str += f'            fprintf(f, ",\"{var}\":%%lld", (long long)e->data.{base}.{var});\n'
+                case_str += f'            fprintf(f, ",\\"{var}\\":%lld", (long long)e->data.{base}.{var});\n'
             elif typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']:
-                case_str += f'            fprintf(f, ",\"{var}\":%%llu", (unsigned long long)e->data.{base}.{var});\n'
+                case_str += f'            fprintf(f, ",\\"{var}\\":%llu", (unsigned long long)e->data.{base}.{var});\n'
             else: # int, pid_t, uid_t, etc.
-                case_str += f'            fprintf(f, ",\"{var}\":%%d", e->data.{base}.{var});\n'
+                case_str += f'            fprintf(f, ",\\"{var}\\":%d", e->data.{base}.{var});\n'
         case_str += "            break;"
         event_cases.append(case_str)
 
