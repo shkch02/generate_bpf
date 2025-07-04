@@ -285,6 +285,7 @@ all: $(OBJECTS) $(SKELETONS) monitor_loader
 monitor_loader: monitor_loader.c
     gcc -o $@ $< \
     -Iinclude \
+    -I. \
     -I$(LLVM_SYSROOT)/include \
     -I$(KERNEL_SRCDIR)/tools/lib/bpf/include \
     -lbpf -lrdkafka -lpthread
@@ -301,6 +302,7 @@ def generate_makefile(targets):
 
 # --- monitor_loader.c 생성 ---
 # IMPROVEMENT: Kafka 관련 로직 개선 및 에러 처리 추가
+#bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 LOADER_TEMPLATE = textwrap.dedent("""
 #include <stdio.h>
 #include <stdlib.h>
@@ -310,7 +312,7 @@ LOADER_TEMPLATE = textwrap.dedent("""
 #include <bpf/libbpf.h>
 #include <librdkafka/rdkafka.h>
 #include "include/common_event.h"
-{includes}
+{includes} bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 
 static volatile bool running = true;
 static rd_kafka_t *rk;
