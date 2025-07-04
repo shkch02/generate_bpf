@@ -123,8 +123,26 @@ for name in missing:
 # 전역 SPECIAL_MAP 에 자동 매핑 반영
 SPECIAL_MAP.update(auto_map)
 
+#여기에 내가 직접 스페셜 맵 요소 수동으로 적을거
+manual_map = {
+    '_newselect':  'select',       # kernel has __x64_sys__newselect
+    'fstatat64':   'newfstatat',    # kernel has __x64_sys_fstatat64
+    'mmap2':       'mmap',         # kernel has __x64_sys_mmap
+    'oldfstat':    'fstat',        # kernel has __x64_sys_fstat
+    'oldlstat':    'lstat',        # kernel has __x64_sys_lstat
+    'oldolduname': 'uname',        # kernel has __x64_sys_uname
+    'oldstat':     'stat',         # kernel has __x64_sys_stat
+    'readdir':     'getdents',     # kernel has __x64_sys_getdents
+    'sigaction':   'rt_sigaction', # kernel has __x64_sys_rt_sigaction
+    'sigreturn':   'rt_sigreturn', # kernel has __x64_sys_rt_sigreturn
+    'syscall':     'syscall',      # kernel has __x64_sys_syscall
+    'ugetrlimit':  'getrlimit',    # kernel has __x64_sys_getrlimit
+    'umount2':     'umount',       # kernel has __x64_sys_umount2
+}
+SPECIAL_MAP.update(manual_map)
+
 # 5) 이제 남은 것들(수동 매핑 필요)만 다시 계산
-remaining = [n for n in missing if n not in auto_map]
+remaining = [n for n in missing if n not in auto_map and n not in manual_map]
 
 if remaining:
     print("=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===")
