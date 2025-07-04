@@ -29,11 +29,7 @@ TYPEDEF_TO_UNDERLYING_TYPE = {
     'cap_user_data_t': 'struct __user_cap_data',
 }
 
-# alias_map: 필요 시 파생 syscall 이름 추가
-#alias_map = {
- #   'clone': ['clone', 'clone2', 'clone3'],
- # 여기에 추가 파생 이름을 넣으면 자동 확장됨
-#}
+SPECIAL_MAP = {}
 
 # --- eBPF 코드 템플릿 ---
 # BUGFIX: if(e) -> if(!e)
@@ -97,6 +93,51 @@ int trace_{name}(struct pt_regs *ctx) {{
     return 0;
 }}
 """)
+
+# ———————————————————————————————————————————————————
+# 1) /proc/kallsyms 에서 __x64_sys_* 심볼 추출
+with open("/proc/kallsyms") as f:
+    kernel_syms = {
+        re.sub(r"^__x64_sys_", "", line.split()[-1])
+        for line in f
+        if "__x64_sys_" in line
+    }
+
+# 2) CSV 에서 syscall 이름들 뽑기
+df_tmp = pd.read_csv(CSV_PATH)
+csv_syscalls = set(df_tmp["syscall name"].tolist())
+
+# 3) 커널에 없는 것들
+missing = sorted(csv_syscalls - kernel_syms)
+
+# 4) 자동 후보 추론
+auto_map = {}
+for name in missing:
+    cand = name.lstrip('_')  # 앞 언더바 제거
+    for suffix in ('time32','time64','32','64'):
+        if cand.endswith(suffix):
+            cand = cand[:-len(suffix)]
+    if cand in kernel_syms:
+        auto_map[name] = cand
+
+# 전역 SPECIAL_MAP 에 자동 매핑 반영
+SPECIAL_MAP.update(auto_map)
+
+# 5) 이제 남은 것들(수동 매핑 필요)만 다시 계산
+remaining = [n for n in missing if n not in auto_map]
+
+if remaining:
+    print("=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===")
+    for name in remaining:
+        print(f"    '{name}': '???',  # kernel has __x64_sys_{name}")
+    print("==============================================\n")
+
+if auto_map:
+    print("=== 자동으로 채워진 SPECIAL_MAP 항목들 ===")
+    for k, v in auto_map.items():
+        print(f"    '{k}': '{v}',")
+    print("=========================================\n")
+# ———————————————————————————————————————————————————
 
 # --- man 페이지에서 인자 이름 추출 ---
 def get_proto(syscall):
@@ -254,11 +295,15 @@ def generate_bpf_sources(syscalls, df):
     """ CSV와 템플릿을 기반으로 다수의 .bpf.c 파일을 생성 """
     os.makedirs(BPF_DIR, exist_ok=True)
     for alias, base in syscalls:
+        if alias in SPECIAL_MAP:
+            hook_name = SPECIAL_MAP[alias]
+        else:
+            hook_name = alias
         row = df[df['syscall name'] == base].iloc[0]
         types, arg_names = get_syscall_info(row, alias)
         
         code = BPF_TEMPLATE.format(
-            name=alias,
+            name=hook_name,
             NAME=base.upper(), # Use base name for event type for consistency
             bindings=make_bindings(base, types, arg_names)
         )
