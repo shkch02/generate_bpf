@@ -132,6 +132,7 @@ manual_map = {
     'oldlstat':    'lstat',        # kernel has __x64_sys_lstat
     'oldolduname': 'uname',        # kernel has __x64_sys_uname
     'oldstat':     'stat',         # kernel has __x64_sys_stat
+    'olduname': 'uname',          # kernel has __x64_sys_uname
     'readdir':     'getdents',     # kernel has __x64_sys_getdents
     'sigaction':   'rt_sigaction', # kernel has __x64_sys_rt_sigaction
     'sigreturn':   'rt_sigreturn', # kernel has __x64_sys_rt_sigreturn
