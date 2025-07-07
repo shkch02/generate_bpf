@@ -1,3 +1,10 @@
 temp_syscalls.txt
-extract_syscalls.py
 syscalls_man_page.txt
+data.capset.hdrp)
+data.capset.datap)
+log.txt
+syscalls_man_page.txt
+temp_syscalls.txt
+ts_ns
+코드 개편안.txt
+vmlinux.h
