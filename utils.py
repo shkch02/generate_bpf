@@ -4,7 +4,7 @@ import subprocess
 import pandas as pd
 from config import CSV_PATH, MANUAL_MAP
 
-# --- man 페이지에서 인자 이름 추출 ---
+# --- man 페이지 분석해서 시스템 콜별 인자 이름 추출 ---
 def get_proto(syscall):
     """ `man 2 syscall` 호출 후 SYNOPSIS에서 인자 타입과 이름을 추출 """
     try:
@@ -74,7 +74,7 @@ def get_proto(syscall):
         
     return types, names
 
-# --- CSV 파싱 및 alias 확장 ---
+# --- CSV 파일 파싱 및 alias 확장 ---
 def parse_csv():
     """ CSV를 파싱하고 alias를 확장하여 syscall 목록을 반환 """
     try:
@@ -85,15 +85,19 @@ def parse_csv():
     syscalls = []  # list of (alias, base)
     for base in df['syscall name'].unique():
         syscalls.append((base, base)) # alias_map 없이 기본 이름만 사용
-    return syscalls, df
+    return syscalls
+# csv읽어 목록 조회하는거 말고도 리눅스 man 2 syscalls 에 있는 목록 정보 파싱하여 목록을 얻을수도 있음 그게 더 나을거 같은데
+
+
 
 # --- REFACTOR: 중복 로직을 헬퍼 함수로 추출 ---
-def get_syscall_info(row, syscall_name):
+def get_syscall_info(syscall_name):
     """ 주어진 syscall에 대한 타입과 인자 이름 목록을 man 페이지에서 직접 추출 """
     types, arg_names = get_proto(syscall_name)
     return types, arg_names
 
 # --- REFACTOR: syscall 분석 및 자동 매핑하여 code_generater로 넘겨줘야함(미구현) ---
+# 얘 왜 man이 아니라 kallsyms 분석해서 쓰고있지? -> man페이지와 kprobe에 사용하는 시스템콜 이름이 다름, 이를 바꿔줘야함
 def analyze_syscall():
     # 1) /proc/kallsyms 에서 __x64_sys_* 심볼 추출
     with open("/proc/kallsyms") as f:
@@ -121,11 +125,14 @@ def analyze_syscall():
             auto_map[name] = cand
 
     # 전역 SPECIAL_MAP 에 자동 매핑 반영
-    SPECIAL_MAP.update(auto_map)
+    #SPECIAL_MAP.update(auto_map)
+    final_special_map = MANUAL_MAP.copy()
+
 
     #여기에 내가 직접 스페셜 맵 요소 수동으로 적을거
-    SPECIAL_MAP.update(MANUAL_MAP)
+    #SPECIAL_MAP.update(MANUAL_MAP)
 
+    final_special_map.update(auto_map)
     # 5) 이제 남은 것들(수동 매핑 필요)만 다시 계산
     remaining = [n for n in missing if n not in auto_map and n not in MANUAL_MAP]
 
@@ -140,4 +147,5 @@ def analyze_syscall():
         for k, v in auto_map.items():
             print(f"    '{k}': '{v}',")
         print("=========================================\n")
-    
+
+    return final_special_map

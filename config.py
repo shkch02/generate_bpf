@@ -12,8 +12,6 @@ TYPEDEF_TO_UNDERLYING_TYPE = {
     'cap_user_data_t': 'struct __user_cap_data',
 }
 
-SPECIAL_MAP = {}
-
 MANUAL_MAP = {
     '_newselect':  'select',       # kernel has __x64_sys__newselect
     'fstatat64':   'newfstatat',    # kernel has __x64_sys_fstatat64

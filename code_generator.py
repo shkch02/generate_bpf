@@ -3,6 +3,8 @@ import os
 import textwrap
 import templates
 from config import BPF_DIR, OUT_DIR, EVENT_HDR, EVENT_HDR_USER
+from utils import get_syscall_info
+from templates import BPF_TEMPLATE, MAKEFILE, LOADER_TEMPLATE, BPF_HEADER, USER_HEADER, STRUCT_TMPL
 
 # --- 인자 바인딩 생성 ---
 def make_bindings(name, types, arg_names):
@@ -66,16 +68,15 @@ def make_bindings(name, types, arg_names):
     return "\n".join(lines)
 
 # --- .bpf.c 파일 생성 ---
-def generate_bpf_sources(syscalls, df):
+def generate_bpf_sources(syscalls,special_map):
     """ CSV와 템플릿을 기반으로 다수의 .bpf.c 파일을 생성 """
     os.makedirs(BPF_DIR, exist_ok=True)
     for alias, base in syscalls:
-        if alias in SPECIAL_MAP:
-            hook_name = SPECIAL_MAP[alias]
+        if alias in special_map:
+            hook_name = special_map[alias]
         else:
             hook_name = alias
-        row = df[df['syscall name'] == base].iloc[0]
-        types, arg_names = get_syscall_info(row, alias)
+        types, arg_names = get_syscall_info(alias)
         
         code = BPF_TEMPLATE.format(
             name=hook_name,
@@ -96,19 +97,18 @@ def generate_makefile(targets):
 
     # --- 로더 C 코드 생성 ---
 
-def generate_loader(targets, df):
+def generate_loader(targets):
     """ 로더 C 코드(monitor_loader.c)를 생성 """
     includes, skeletons, attaches, destroys, event_cases,enum_strings = [], [], [], [], [],[]
     
     # Generate serialization cases for each syscall
-    unique_bases = df['syscall name'].unique()
-    for base in unique_bases:
+    #unique_bases = df['syscall name'].unique()
+    for base in targets:
         upper_base = base.upper()
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
         case_str = f"        case EVT_{base.upper()}:\n"
         
-        row = df[df['syscall name'] == base].iloc[0]
-        types, arg_names = get_syscall_info(row, base)
+        types, arg_names = get_syscall_info(base)
 
         for typ, var in zip(types, arg_names):
         # 1) 포인터(배열·struct·기타 포인터)인 경우
@@ -182,18 +182,17 @@ def generate_loader(targets, df):
     print("Generated monitor_loader.c")
 
 # --- common_event.h 생성 ---
-def generate_common_event_bpf(df):
+def generate_common_event_bpf(targets):
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
     
-    unique_bases = df['syscall name'].unique()
+    #unique_bases = df['syscall name'].unique()
 
-    for base in unique_bases:
+    for base in targets:
         upper_base = base.upper()
         enum_lines.append(f"    EVT_{upper_base},")
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
 
-        row = df[df['syscall name'] == base].iloc[0]
-        types, arg_names = get_syscall_info(row, base)
+        types, arg_names = get_syscall_info(base)
         
         fields = []
         for typ, var in zip(types, arg_names):
@@ -290,18 +289,17 @@ def generate_common_event_bpf(df):
         f.write(content)
     print(f"Generated {EVENT_HDR}")
 
-def generate_common_event_user(df):
+def generate_common_event_user(targets):
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
     
-    unique_bases = df['syscall name'].unique()
+    #unique_bases = df['syscall name'].unique()
 
-    for base in unique_bases:
+    for base in targets:
         upper_base = base.upper()
         enum_lines.append(f"    EVT_{upper_base},")
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
 
-        row = df[df['syscall name'] == base].iloc[0]
-        types, arg_names = get_syscall_info(row, base)
+        types, arg_names = get_syscall_info(base)
         
         fields = []
         for typ, var in zip(types, arg_names):
