@@ -10,7 +10,7 @@ from templates import BPF_TEMPLATE, MAKEFILE, LOADER_TEMPLATE, BPF_HEADER, USER_
 def make_bindings(name, types, arg_names):
     """ eBPF 코드에 삽입될 인자 바인딩 C 코드를 생성 """
     # 사용자-공간 typedef → 커널 BTF 매핑
-    typedef_map = {
+    typedef_map = { #_generate_common_event_content의 매핑이랑 통합할 필요 있는거 같은데
         'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
         'id_t':       '__kernel_pid_t',
         'struct timeval':  'struct __kernel_old_timeval',
@@ -181,11 +181,57 @@ def generate_loader(targets):
         f.write(loader)
     print("Generated monitor_loader.c")
 
-# --- common_event.h 생성 ---
-def generate_common_event_bpf(targets):
+def _generate_common_event_content(targets,template):
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
-    
     #unique_bases = df['syscall name'].unique()
+
+    mapping = {
+        # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
+        'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
+        'id_t':       '__kernel_pid_t',
+        #'struct timeval':  'struct __kernel_old_timeval',
+        #'struct timespec': 'struct __kernel_timespec',
+        'enum __ptrace_request': '__s32',
+        'nfds_t':     '__u32',
+        'caddr_t':    '__u64',
+        'off64_t':    '__s64',
+        'time_t':     '__kernel_time64_t',
+        'clockid_t':  '__kernel_clockid_t',
+        'timer_t':    '__kernel_timer_t',
+        'dev_t':      '__kernel_dev_t',
+        'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet, use u64
+        'mode_t':     'umode_t',
+        'uid_t':      '__kernel_uid32_t',
+        'gid_t':      '__kernel_gid32_t',
+        'size_t':     '__kernel_size_t',
+        'ssize_t':    '__kernel_ssize_t',
+        'loff_t':     '__kernel_loff_t',
+        'pid_t':      '__kernel_pid_t',
+        'sighandler_t': '__sighandler_t', # Corrected based on log
+        'idtype_t': '__s32', # Not found in vmlinux.h, use int
+        'enum __ptrace_request': '__s32', # Not found in vmlinux.h, use int
+        # Add other mappings as needed based on compilation errors
+    }
+
+    btf_structs = {
+        # vmlinux.h에서 직접 찾아서 추가해야 합니다.
+        'struct __user_cap_header',
+        'struct __user_cap_data',
+        'struct __kernel_timespec', # Corrected based on log
+        'struct __kernel_old_timeval', # Corrected based on log
+        'struct timex', # Assuming this exists, if not, it will error again.
+        'struct itimerval', # Assuming this exists, if not, it will error again.
+        # Add other BTF structs as needed
+     }
+
+    basic_map = {
+        'int':'__s32','unsigned int':'__u32',
+        'long':'__s64','unsigned long':'__u64',
+        'short':'__s16','unsigned short':'__u16',
+        'char':'__s8','unsigned char':'__u8',
+        'bool':'_Bool',
+     # pid_t, uid_t 등은 위 typedef 매핑에서 처리
+    }
 
     for base in targets:
         upper_base = base.upper()
@@ -196,9 +242,6 @@ def generate_common_event_bpf(targets):
         
         fields = []
         for typ, var in zip(types, arg_names):
-            # --- 배열 인자 먼저 처리 ---
-            core   = typ.replace('const','').replace('*','').split('[')[0].strip()
-            is_ptr = '*' in typ
             # --- 배열, timeval/timespec, 기타 포인터 먼저 처리 ---
             core = typ.replace('const','').replace('*','').split('[')[0].strip()
             is_ptr = '*' in typ
@@ -216,61 +259,15 @@ def generate_common_event_bpf(targets):
            #     fields.append(f"    __u64 {var}_ptr;")
            #     continue
 
-            # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
-            mapping = {
-                'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
-                'id_t':       '__kernel_pid_t',
-                #'struct timeval':  'struct __kernel_old_timeval',
-                #'struct timespec': 'struct __kernel_timespec',
-                'enum __ptrace_request': '__s32',
-                'nfds_t':     '__u32',
-                'caddr_t':    '__u64',
-                'off64_t':    '__s64',
-                'time_t':     '__kernel_time64_t',
-                'clockid_t':  '__kernel_clockid_t',
-                'timer_t':    '__kernel_timer_t',
-                'dev_t':      '__kernel_dev_t',
-                'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet, use u64
-                'mode_t':     'umode_t',
-                'uid_t':      '__kernel_uid32_t',
-                'gid_t':      '__kernel_gid32_t',
-                'size_t':     '__kernel_size_t',
-                'ssize_t':    '__kernel_ssize_t',
-                'loff_t':     '__kernel_loff_t',
-                'pid_t':      '__kernel_pid_t',
-                'sighandler_t': '__sighandler_t', # Corrected based on log
-                'idtype_t': '__s32', # Not found in vmlinux.h, use int
-                'enum __ptrace_request': '__s32', # Not found in vmlinux.h, use int
-                # Add other mappings as needed based on compilation errors
-            }
             if core in mapping:
                 fields.append(f"    {mapping[core]} {var};")
                 continue
 
             # 4) 커널 BTF에 정의된 구조체 이름은 그대로 사용
-            # vmlinux.h에서 직접 찾아서 추가해야 합니다.
-            btf_structs = {
-                'struct __user_cap_header',
-                'struct __user_cap_data',
-                'struct __kernel_timespec', # Corrected based on log
-                'struct __kernel_old_timeval', # Corrected based on log
-                'struct timex', # Assuming this exists, if not, it will error again.
-                'struct itimerval', # Assuming this exists, if not, it will error again.
-                # Add other BTF structs as needed
-            }
             if core in btf_structs:
                 fields.append(f"    {core} {var};")
                 continue
 
-            # 5) 그 외 기본 산술 타입 -> __s32/__u32 등으로 매핑
-            basic_map = {
-                'int':'__s32','unsigned int':'__u32',
-                'long':'__s64','unsigned long':'__u64',
-                'short':'__s16','unsigned short':'__u16',
-                'char':'__s8','unsigned char':'__u8',
-                'bool':'_Bool',
-                # pid_t, uid_t 등은 위 typedef 매핑에서 처리
-            }
             ktyp = basic_map.get(core, core)
             fields.append(f"    {ktyp} {var};")
         
@@ -278,119 +275,28 @@ def generate_common_event_bpf(targets):
         struct_lines.append(struct_code)
         union_lines.append(f"        struct {base}_event_t {base};")
 
-    content = BPF_HEADER.format(
+    content = template.format(
         enum_entries="\n".join(enum_lines),
         enum_strings="\n".join(enum_strings),
         struct_definitions="\n".join(struct_lines),
         union_entries="\n".join(union_lines)
     )
+    return content
+
+# --- common_event.h 생성 ---
+def generate_common_event_bpf(targets):
+    # 1. BPF용 템플릿(BPF_HEADER)을 사용하여 공통 함수 호출
+    content = _generate_common_event_content(targets, BPF_HEADER)
+
+    # 2. BPF용 경로(EVENT_HDR)에 파일 작성
     os.makedirs(os.path.dirname(EVENT_HDR), exist_ok=True)
     with open(EVENT_HDR, 'w') as f:
         f.write(content)
-    print(f"Generated {EVENT_HDR}")
+    print(f"Generated {EVENT_HDR}")    
 
 def generate_common_event_user(targets):
-    enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
-    
-    #unique_bases = df['syscall name'].unique()
+    content = _generate_common_event_content(targets, USER_HEADER)
 
-    for base in targets:
-        upper_base = base.upper()
-        enum_lines.append(f"    EVT_{upper_base},")
-        enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
-
-        types, arg_names = get_syscall_info(base)
-        
-        fields = []
-        for typ, var in zip(types, arg_names):
-            # --- 배열 인자 먼저 처리 ---
-            core   = typ.replace('const','').replace('*','').split('[')[0].strip()
-            is_ptr = '*' in typ
-            # --- 배열, timeval/timespec, 기타 포인터 먼저 처리 ---
-            core = typ.replace('const','').replace('*','').split('[')[0].strip()
-            is_ptr = '*' in typ
-            if '[' in typ or core in ('struct timeval','struct timespec') or (is_ptr and core != 'char'):
-                fields.append(f"    __u64 {var}_ptr;")
-                continue          
-
-            # 1) 문자열 포인터 -> 고정배열
-            if is_ptr and core == 'char':
-                fields.append(f"    char {var}[MAX_STR_LEN];")
-                continue
-            
-            # 2) 기타 포인터 -> 주소만 저장
-           # if is_ptr:
-           #     fields.append(f"    __u64 {var}_ptr;")
-           #     continue
-
-            # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
-            mapping = {
-                'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
-                'id_t':       '__kernel_pid_t',
-                #'struct timeval':  'struct __kernel_old_timeval',
-                #'struct timespec': 'struct __kernel_timespec',
-                'enum __ptrace_request': '__s32',
-                'nfds_t':     '__u32',
-                'caddr_t':    '__u64',
-                'off64_t':    '__s64',
-                'time_t':     '__kernel_time64_t',
-                'clockid_t':  '__kernel_clockid_t',
-                'timer_t':    '__kernel_timer_t',
-                'dev_t':      '__kernel_dev_t',
-                'ino_t':      'u64', # __kernel_ino_t not found in vmlinux.h snippet, use u64
-                'mode_t':     'umode_t',
-                'uid_t':      '__kernel_uid32_t',
-                'gid_t':      '__kernel_gid32_t',
-                'size_t':     '__kernel_size_t',
-                'ssize_t':    '__kernel_ssize_t',
-                'loff_t':     '__kernel_loff_t',
-                'pid_t':      '__kernel_pid_t',
-                'sighandler_t': '__sighandler_t', # Corrected based on log
-                'idtype_t': '__s32', # Not found in vmlinux.h, use int
-                'enum __ptrace_request': '__s32', # Not found in vmlinux.h, use int
-                # Add other mappings as needed based on compilation errors
-            }
-            if core in mapping:
-                fields.append(f"    {mapping[core]} {var};")
-                continue
-
-            # 4) 커널 BTF에 정의된 구조체 이름은 그대로 사용
-            # vmlinux.h에서 직접 찾아서 추가해야 합니다.
-            btf_structs = {
-                'struct __user_cap_header',
-                'struct __user_cap_data',
-                'struct __kernel_timespec', # Corrected based on log
-                'struct __kernel_old_timeval', # Corrected based on log
-                'struct timex', # Assuming this exists, if not, it will error again.
-                'struct itimerval', # Assuming this exists, if not, it will error again.
-                # Add other BTF structs as needed
-            }
-            if core in btf_structs:
-                fields.append(f"    {core} {var};")
-                continue
-
-            # 5) 그 외 기본 산술 타입 -> __s32/__u32 등으로 매핑
-            basic_map = {
-                'int':'__s32','unsigned int':'__u32',
-                'long':'__s64','unsigned long':'__u64',
-                'short':'__s16','unsigned short':'__u16',
-                'char':'__s8','unsigned char':'__u8',
-                'bool':'_Bool',
-                # pid_t, uid_t 등은 위 typedef 매핑에서 처리
-            }
-            ktyp = basic_map.get(core, core)
-            fields.append(f"    {ktyp} {var};")
-        
-        struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
-        struct_lines.append(struct_code)
-        union_lines.append(f"        struct {base}_event_t {base};")
-
-    content = USER_HEADER.format(
-        enum_entries="\n".join(enum_lines),
-        enum_strings="\n".join(enum_strings),
-        struct_definitions="\n".join(struct_lines),
-        union_entries="\n".join(union_lines)
-    )
     os.makedirs(os.path.dirname(EVENT_HDR_USER), exist_ok=True)
     with open(EVENT_HDR_USER, 'w') as f:
         f.write(content)
