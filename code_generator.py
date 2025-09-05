@@ -12,7 +12,6 @@ KERNEL_TYPE_MAP = {
         'id_t':       '__kernel_pid_t',
         #'struct timeval':  'struct __kernel_old_timeval',
         #'struct timespec': 'struct __kernel_timespec',
-        'enum __ptrace_request': '__s32',
         'nfds_t':     '__u32',
         'caddr_t':    '__u64',
         'off64_t':    '__s64',
@@ -96,73 +95,77 @@ def generate_makefile(targets):
 
     # --- 로더 C 코드 생성 ---
 
-def generate_loader(targets):
+def generate_loader(syscalls):
     """ 로더 C 코드(monitor_loader.c)를 생성 """
     includes, skeletons, attaches, destroys, event_cases,enum_strings = [], [], [], [], [],[]
     
-    # Generate serialization cases for each syscall
-    #unique_bases = df['syscall name'].unique()
-    for base in targets:
+    aliases = sorted([alias for alias, _ in syscalls])
+    bases = sorted(list(set(base for _, base in syscalls)))
+
+    # Generate serialization cases for each unique base syscall
+    for base in bases:
         upper_base = base.upper()
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
         case_str = f"        case EVT_{base.upper()}:\n"
         
-        types, arg_names = get_syscall_info(base)
+        # Find a representative alias to get the function signature
+        rep_alias = next(alias for alias, b in syscalls if b == base)
+        types, arg_names = get_syscall_info(rep_alias)
 
         for typ, var in zip(types, arg_names):
         # 1) 포인터(배열·struct·기타 포인터)인 경우
             if '[' in typ or ('*' in typ and 'char' not in typ):
         # 실제 멤버 이름은 var + "_ptr"
                 case_str += (
-                   f'            fprintf(f, ",\\"{var}\\":%llu", '
+                   f'            fprintf(f, ",\\\"{var}\\\":%llu", '
                     f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
                 )
                 continue
 
     # 2) 문자열(char*)인 경우
             elif '*' in typ and 'char' in typ:
-                case_str += (
-                    f'            fprintf(f, ",\\"{var}\\":\\"%s\\"", '
-                    f'e->data.{base}.{var});\n'
-                )
+                case_str += f'            fprintf(f, ",\"{var}\":\"");\n'
+                case_str += f'            fprint_json_escaped_str(f, e->data.{base}.{var});\n'
+                continue
                 continue
 
     # 3) long 계열
             elif typ in ['long', 'ssize_t', 'off_t', 'loff_t', 'time_t']:
                 case_str += (
-                    f'            fprintf(f, ",\\"{var}\\":%lld", '
+                    f'            fprintf(f, ",\\\"{var}\\\":%lld", '
                     f'(long long)e->data.{base}.{var});\n'
                 )
 
     # 4) unsigned long 계열
             elif typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']:
                case_str += (
-                   f'            fprintf(f, ",\\"{var}\\":%llu", '
+                   f'            fprintf(f, ",\\\"{var}\\\":%llu", '
                    f'(unsigned long long)e->data.{base}.{var});\n'
                )
 
     # 5) 나머지 정수형
             else:
                case_str += (
-                   f'            fprintf(f, ",\\"{var}\\":%d", '
+                   f'            fprintf(f, ",\\\"{var}\\\":%d", '
                    f'e->data.{base}.{var});\n'
                )
 
-    # 각 case 의 마지막에는 반드시 break
-    case_str += "            break;\n"
-    event_cases.append(case_str)
+        # 각 case 의 마지막에는 반드시 break
+        case_str += "            break;\n"
+        event_cases.append(case_str)
 
-    for alias in targets:
+    # Generate includes, skeletons, etc. for each alias
+    for alias in aliases:
         includes.append(f'#include "bpf/{alias}_monitor.skel.h"')
         skeletons.append(f"    struct {alias}_monitor_bpf *{alias}_skel = NULL;")
         attaches.append(textwrap.dedent(f"""
     {alias}_skel = {alias}_monitor_bpf__open_and_load();
     if (!{alias}_skel) {{
-        fprintf(stderr, "Failed to open and load {alias} skeleton\\n");
+        fprintf(stderr, "Failed to open and load {alias} skeleton\n");
         goto cleanup;
     }}
     if ({alias}_monitor_bpf__attach({alias}_skel) != 0) {{
-        fprintf(stderr, "Failed to attach {alias} skeleton\\n");
+        fprintf(stderr, "Failed to attach {alias} skeleton\n");
         goto cleanup;
     }}"""))
         destroys.append(f"    if ({alias}_skel) {alias}_monitor_bpf__destroy({alias}_skel);")
@@ -172,7 +175,7 @@ def generate_loader(targets):
         skeletons='\n'.join(skeletons),
         attaches='\n'.join(attaches),
         destroys='\n'.join(destroys),
-        first=targets[0],
+        first=aliases[0],
         event_cases='\n'.join(event_cases),
         enum_strings='\n'.join(enum_strings)
     )
@@ -272,4 +275,3 @@ def generate_common_event_user(targets):
     with open(EVENT_HDR_USER, 'w') as f:
         f.write(content)
     print(f"Generated {EVENT_HDR_USER}")
-

@@ -1,14 +1,18 @@
+
+
 # utils.py
+import os
 import re
 import subprocess
-import pandas as pd
-from config import CSV_PATH, MANUAL_MAP
+from config import MANUAL_MAP
 
 # --- man 페이지 분석해서 시스템 콜별 인자 이름 추출 ---
 def get_proto(syscall):
     """ `man 2 syscall` 호출 후 SYNOPSIS에서 인자 타입과 이름을 추출 """
     try:
-        text = subprocess.check_output(['man', '2', syscall], text=True, stderr=subprocess.PIPE)
+        env = os.environ.copy()
+        env['LC_ALL'] = 'C'
+        text = subprocess.check_output(['man', '2', syscall], text=True, stderr=subprocess.PIPE, env=env)
     except (subprocess.CalledProcessError, FileNotFoundError):
         return [], [] # Return empty types and names
     
@@ -74,20 +78,70 @@ def get_proto(syscall):
         
     return types, names
 
-# --- CSV 파일 파싱 및 alias 확장 ---
-def parse_csv():
-    """ CSV를 파싱하고 alias를 확장하여 syscall 목록을 반환 """
+def parse_man():
+    """
+    'man 2 syscalls' 페이지의 'System call list' 테이블을 파싱하여
+    x86_64에서 사용 가능한 시스템 콜 목록을 동적으로 생성합니다.
+    """
+    print("Parsing 'man 2 syscalls' to get the list of syscalls...")
     try:
-        df = pd.read_csv(CSV_PATH)
-    except FileNotFoundError:
-        print(f"Error: '{CSV_PATH}' not found.")
-        exit(1)
-    syscalls = []  # list of (alias, base)
-    for base in df['syscall name'].unique():
-        syscalls.append((base, base)) # alias_map 없이 기본 이름만 사용
-    return syscalls
-# csv읽어 목록 조회하는거 말고도 리눅스 man 2 syscalls 에 있는 목록 정보 파싱하여 목록을 얻을수도 있음 그게 더 나을거 같은데
+        env = os.environ.copy()
+        env['LC_ALL'] = 'C'
+        text = subprocess.check_output(['man', '2', 'syscalls'], text=True, stderr=subprocess.PIPE, env=env)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("\n[ERROR] 'man 2 syscalls' command failed. Is 'manpages-dev' installed?")
+        return []
 
+    # 필터링할 키워드 정의 (소문자로 비교)
+    EXCLUDE_KEYWORDS = [
+        'alpha', 'arc', 'arm', 'avr32', 'blackfin', 'csky', 'ia-64', 'm68k', 
+        'metag', 'mips', 'openrisc', 'parisc', 'powerpc', 'risc-v', 's390', 
+        'sh', 'sparc', 'xtensa', 'tile',
+        'not on x86', 'removed in', 'deprecated'
+    ]
+
+    syscall_names = set()
+    in_table = False
+
+    for line in text.splitlines():
+        # 테이블 시작점 찾기
+        if "System call" in line and "Kernel" in line and "Notes" in line:
+            in_table = True
+            continue
+        
+        # 테이블 종료점 찾기
+        if in_table and line.strip() == "SEE ALSO":
+            break
+            
+        if in_table:
+            # 빈 줄이나 구분선은 건너뛰기
+            if not line.strip() or "──────" in line:
+                continue
+
+            match = re.match(r'^\s*(\w+)\(2\)', line)
+            if not match:
+                continue
+            
+            name = match.group(1)
+            notes = line[match.end():].strip().lower()
+            
+            is_excluded = False
+            if notes:
+                for keyword in EXCLUDE_KEYWORDS:
+                    if keyword in notes:
+                        is_excluded = True
+                        break
+            
+            if not is_excluded:
+                syscall_names.add(name)
+
+    if not syscall_names:
+        print("\n[WARNING] Could not parse any valid syscalls from man page.")
+        return []
+        
+    print(f"Successfully parsed {len(syscall_names)} filtered syscalls from man page.")
+    
+    return [(name, name) for name in sorted(list(syscall_names))]
 
 
 # --- REFACTOR: 중복 로직을 헬퍼 함수로 추출 ---
@@ -97,22 +151,29 @@ def get_syscall_info(syscall_name):
     return types, arg_names
 
 # --- REFACTOR: syscall 분석 및 자동 매핑하여 code_generater로 넘겨줘야함(미구현) ---
-# 얘 왜 man이 아니라 kallsyms 분석해서 쓰고있지? -> man페이지와 kprobe에 사용하는 시스템콜 이름이 다름, 이를 바꿔줘야함
 def analyze_syscall():
     # 1) /proc/kallsyms 에서 __x64_sys_* 심볼 추출
-    with open("/proc/kallsyms") as f:
-        kernel_syms = {
-            re.sub(r"^__x64_sys_", "", line.split()[-1])
-            for line in f
-            if "__x64_sys_" in line
-        }
+    try:
+        with open("/proc/kallsyms") as f:
+            kernel_syms = {
+                re.sub(r"^__x64_sys_", "", line.split()[-1])
+                for line in f
+                if "__x64_sys_" in line
+            }
+    except FileNotFoundError:
+        print("[ERROR] /proc/kallsyms not found. Are you running on Linux?")
+        return {}, []
 
-    # 2) CSV 에서 syscall 이름들 뽑기
-    df_tmp = pd.read_csv(CSV_PATH)
-    csv_syscalls = set(df_tmp["syscall name"].tolist())
+    # 2) man 페이지에서 syscall 이름들 뽑기
+    syscalls_from_man = parse_man()
+    if not syscalls_from_man:
+        print("[ERROR] Could not get syscall list. Aborting.")
+        return {}, []
+        
+    user_space_syscalls = {name for name, _ in syscalls_from_man}
 
     # 3) 커널에 없는 것들
-    missing = sorted(csv_syscalls - kernel_syms)
+    missing = sorted(user_space_syscalls - kernel_syms)
 
     # 4) 자동 후보 추론
     auto_map = {}
@@ -124,22 +185,16 @@ def analyze_syscall():
         if cand in kernel_syms:
             auto_map[name] = cand
 
-    # 전역 SPECIAL_MAP 에 자동 매핑 반영
-    #SPECIAL_MAP.update(auto_map)
     final_special_map = MANUAL_MAP.copy()
-
-
-    #여기에 내가 직접 스페셜 맵 요소 수동으로 적을거
-    #SPECIAL_MAP.update(MANUAL_MAP)
-
     final_special_map.update(auto_map)
+    
     # 5) 이제 남은 것들(수동 매핑 필요)만 다시 계산
     remaining = [n for n in missing if n not in auto_map and n not in MANUAL_MAP]
 
     if remaining:
-        print("=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===")
+        print("\n=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===")
         for name in remaining:
-            print(f"    '{name}': '???',  # kernel has __x64_sys_{name}")
+            print(f"    '{name}': '???',")
         print("==============================================\n")
 
     if auto_map:
@@ -148,4 +203,4 @@ def analyze_syscall():
             print(f"    '{k}': '{v}',")
         print("=========================================\n")
 
-    return final_special_map
+    return final_special_map, syscalls_from_man

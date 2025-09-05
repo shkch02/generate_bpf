@@ -1,6 +1,4 @@
 # config.py
-
-CSV_PATH = 'syscalls_x86_64.csv'
 BPF_DIR = 'bpf' # *.bpf.c 파일들이 저장될 디렉토리
 OUT_DIR = '.' # 최종 출력 디렉토리 (Makefile, monitor_loader.c)
 EVENT_HDR = 'include/common_event.h'

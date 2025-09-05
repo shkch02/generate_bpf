@@ -160,6 +160,34 @@ static void kafka_send(const char* buffer, size_t len) {{
     rd_kafka_poll(rk, 0);
 }}
 
+static void fprint_json_escaped_str(FILE *f, const char *s) {
+    fputc('"', f);
+    if (!s) {
+        fputc('"', f);
+        return;
+    }
+    while (*s) {
+        switch (*s) {
+            case '"': fprintf(f, "\""); break;
+            case '\\': fprintf(f, "\\\\"); break;
+            case '\b': fprintf(f, "\\b"); break;
+            case '\f': fprintf(f, "\\f"); break;
+            case '\n': fprintf(f, "\\n"); break;
+            case '\r': fprintf(f, "\\r"); break;
+            case '\t': fprintf(f, "\\t"); break;
+            default:
+                if ((unsigned char)*s < 0x20) {
+                    fprintf(f, "\\u%04x", (unsigned char)*s);
+                } else {
+                    fputc(*s, f);
+                }
+                break;
+        }
+        s++;
+    }
+    fputc('"', f);
+}
+
 // IMPROVEMENT: Robust JSON serialization for each event type
 static void serialize_and_send(const struct event_t *e) {{
     char *buf = NULL;
