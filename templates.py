@@ -10,7 +10,6 @@ BPF_TEMPLATE = textwrap.dedent("""
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
-#include "common_maps.h"
 #include "common_event.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
