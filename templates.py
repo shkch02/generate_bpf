@@ -13,7 +13,12 @@ BPF_TEMPLATE = textwrap.dedent("""
 #include "common_event.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
-                    
+
+ struct {
+ __uint(type, BPF_MAP_TYPE_RINGBUF);
+ __uint(max_entries, 256 * 1024);
+} events SEC(".maps");
+                   
 
 SEC("kprobe/__x64_sys_{name}")
 int trace_{name}(struct pt_regs *ctx) {{
