@@ -6,7 +6,7 @@ from config import BPF_DIR, OUT_DIR, EVENT_HDR, EVENT_HDR_USER
 from utils import get_syscall_info
 from templates import BPF_TEMPLATE, MAKEFILE, LOADER_TEMPLATE, BPF_HEADER, USER_HEADER, STRUCT_TMPL
 
-ㄴ
+
 KERNEL_TYPE_MAP = {
         # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
         'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
