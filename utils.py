@@ -134,10 +134,11 @@ def parse_man():
                         is_excluded = True
                         break
             
-
             if not is_excluded:
                 #notImplement 함수들 필터링 필요함 //안필요한거 같기도? 어차피 커널단이랑 비교하니까 
                     syscall_names.add(name)
+            if name == 'xtensa':
+                break
 
     if not syscall_names:
         print("\n[WARNING] Could not parse any valid syscalls from man page.")
@@ -196,7 +197,7 @@ def analyze_syscall():
     remaining = [n for n in missing if n not in auto_map and n not in MANUAL_MAP]
 
     if remaining:
-        print("\n=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===")
+        print("\n=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===") #여기에 지금 break 들어가고 있음
         for name in remaining:
             print(f"    '{name}': '???',")
         print("==============================================\n")

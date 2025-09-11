@@ -39,7 +39,7 @@ def main():
 
     print("Generating Makefile and Loader source...")
     generate_makefile(aliases)
-    generate_loader(syscalls)
+    generate_loader(bases,aliases)
 
     print("\n✅ Generation complete. Run 'make' to build.")
 
