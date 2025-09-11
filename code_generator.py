@@ -6,6 +6,7 @@ from config import BPF_DIR, OUT_DIR, EVENT_HDR, EVENT_HDR_USER
 from utils import get_syscall_info
 from templates import BPF_TEMPLATE, MAKEFILE, LOADER_TEMPLATE, BPF_HEADER, USER_HEADER, STRUCT_TMPL
 
+ㄴ
 KERNEL_TYPE_MAP = {
         # 3) 사용자 공간 typedef -> 커널 BTF typedef로 매핑
         'socklen_t': '__u32', # __kernel_socklen_t not found in vmlinux.h, use __u32
@@ -36,6 +37,7 @@ KERNEL_TYPE_MAP = {
 # --- 인자 바인딩 생성 ---
 def make_bindings(name, types, arg_names):
     lines = []
+    sanitized_name = sanitize_identifier(name)
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
         parm = f"PT_REGS_PARM{idx}(ctx)"
         core = typ.replace('const', '').replace('*', '').split('[')[0].strip()
@@ -44,24 +46,24 @@ def make_bindings(name, types, arg_names):
 
         # 1) 배열, struct timeval/timespec, 또는 (char* 제외) 포인터
         if core in ('struct timeval','struct timespec') or is_array or (is_ptr and core != 'char'):
-            lines.append(f"    e->data.{name}.{var}_ptr = (u64){parm};")
+            lines.append(f"    e->data.{sanitized_name}.{var}_ptr = (u64){parm};")
             continue
 
         # 2) 문자열(char*) 포인터 → 사용자 공간에서 문자열 복사
         if is_ptr and core == 'char':
             lines.append(
-                f"    bpf_probe_read_user_str(&e->data.{name}.{var}, "
-                f"sizeof(e->data.{name}.{var}), (void*){parm});")
+                f"    bpf_probe_read_user_str(&e->data.{sanitized_name}.{var}, "
+                f"sizeof(e->data.{sanitized_name}.{var}), (void*){parm});")
             continue
 
         # 3) 일반 typedef → 매핑된 커널 타입으로 캐스트
         if core in KERNEL_TYPE_MAP:
             ktype = KERNEL_TYPE_MAP[core]
-            lines.append(f"    e->data.{name}.{var} = ({ktype}){parm};")
+            lines.append(f"    e->data.{sanitized_name}.{var} = ({ktype}){parm};")
             continue
 
         # 4) 나머지 기본 타입 → 그대로 캐스트
-        lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
+        lines.append(f"    e->data.{sanitized_name}.{var} = ({typ}){parm};")
 
     return "\n".join(lines)
 
@@ -95,6 +97,7 @@ def generate_makefile(targets):
 
     # --- 로더 C 코드 생성 ---
 
+# --- _loader.c 생성 ---
 def generate_loader(syscalls):
     """ 로더 C 코드(monitor_loader.c)를 생성 """
     includes, skeletons, attaches, destroys, event_cases,enum_strings = [], [], [], [], [],[]
@@ -104,6 +107,7 @@ def generate_loader(syscalls):
 
     # Generate serialization cases for each unique base syscall
     for base in bases:
+        sanitized_base = sanitize_identifier(base)
         upper_base = base.upper()
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
         case_str = f"        case EVT_{base.upper()}:\n"
@@ -118,14 +122,14 @@ def generate_loader(syscalls):
         # 실제 멤버 이름은 var + "_ptr"
                 case_str += (
                    f'            fprintf(f, ",\\\"{var}\\\":%llu", '
-                    f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
+                    f'(unsigned long long)e->data.{sanitized_base}.{var}_ptr);\n'
                 )
                 continue
 
     # 2) 문자열(char*)인 경우
             elif '*' in typ and 'char' in typ:
                 case_str += f'            fprintf(f, ",\"{var}\":\"");\n'
-                case_str += f'            fprint_json_escaped_str(f, e->data.{base}.{var});\n'
+                case_str += f'            fprint_json_escaped_str(f, e->data.{sanitized_base}.{var});\n'
                 continue
                 continue
 
@@ -133,21 +137,21 @@ def generate_loader(syscalls):
             elif typ in ['long', 'ssize_t', 'off_t', 'loff_t', 'time_t']:
                 case_str += (
                     f'            fprintf(f, ",\\\"{var}\\\":%lld", '
-                    f'(long long)e->data.{base}.{var});\n'
+                    f'(long long)e->data.{sanitized_base}.{var});\n'
                 )
 
     # 4) unsigned long 계열
             elif typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']:
                case_str += (
                    f'            fprintf(f, ",\\\"{var}\\\":%llu", '
-                   f'(unsigned long long)e->data.{base}.{var});\n'
+                   f'(unsigned long long)e->data.{sanitized_base}.{var});\n'
                )
 
     # 5) 나머지 정수형
             else:
                case_str += (
                    f'            fprintf(f, ",\\\"{var}\\\":%d", '
-                   f'e->data.{base}.{var});\n'
+                   f'e->data.{sanitized_base}.{var});\n'
                )
 
         # 각 case 의 마지막에는 반드시 break
@@ -247,7 +251,8 @@ def _generate_common_event_content(targets,template):
         
         struct_code = STRUCT_TMPL.format(name=base, fields="\n".join(fields))
         struct_lines.append(struct_code)
-        union_lines.append(f"        struct {base}_event_t {base};")
+        sanitized_base = sanitize_identifier(base)
+        union_lines.append(f"        struct {base}_event_t {sanitized_base};")
 
     content = template.format(
         enum_entries="\n".join(enum_lines),

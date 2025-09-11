@@ -78,6 +78,7 @@ def get_proto(syscall):
         
     return types, names
 
+# ---man 2 syscalls 분석하여 시스템 콜 리스트 튜플형태로 추출 ---
 def parse_man():
     """
     'man 2 syscalls' 페이지의 'System call list' 테이블을 파싱하여
@@ -96,7 +97,7 @@ def parse_man():
     EXCLUDE_KEYWORDS = [
         'alpha', 'arc', 'arm', 'avr32', 'blackfin', 'csky', 'ia-64', 'm68k', 
         'metag', 'mips', 'openrisc', 'parisc', 'powerpc', 'risc-v', 's390', 
-        'sh', 'sparc', 'xtensa', 'tile',
+        'sh', 'sparc', 'Xtensa', 'tile',
         'not on x86', 'removed in', 'deprecated'
     ]
 
@@ -117,7 +118,8 @@ def parse_man():
             # 빈 줄이나 구분선은 건너뛰기
             if not line.strip() or "──────" in line:
                 continue
-
+            
+            #정규표현식으로 시스템콜 목록 파싱
             match = re.match(r'^\s*(\w+)\(2\)', line)
             if not match:
                 continue
@@ -132,8 +134,10 @@ def parse_man():
                         is_excluded = True
                         break
             
+
             if not is_excluded:
-                syscall_names.add(name)
+                #notImplement 함수들 필터링 필요함 //안필요한거 같기도? 어차피 커널단이랑 비교하니까 
+                    syscall_names.add(name)
 
     if not syscall_names:
         print("\n[WARNING] Could not parse any valid syscalls from man page.")
@@ -150,7 +154,7 @@ def get_syscall_info(syscall_name):
     types, arg_names = get_proto(syscall_name)
     return types, arg_names
 
-# --- REFACTOR: syscall 분석 및 자동 매핑하여 code_generater로 넘겨줘야함(미구현) ---
+# --- REFACTOR: syscall 분석 및 자동 매핑하여 syscalls,specail maps 리턴 ---
 def analyze_syscall():
     # 1) /proc/kallsyms 에서 __x64_sys_* 심볼 추출
     try:
