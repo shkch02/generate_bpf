@@ -116,7 +116,7 @@ def generate_loader(syscalls):
 
         for typ, var in zip(types, arg_names):
         # JSON 키 부분을 일관되게 생성: ,"<key>":
-            key_part = f',\"{var}\":'
+            key_part = f',\\"{var}\\":'
 
      # 1) 포인터(배열·struct·기타 포인터)인 경우
             if '[' in typ or ('*' in typ and 'char' not in typ):
@@ -155,7 +155,7 @@ def generate_loader(syscalls):
                 )
 
 # 각 case 의 마지막에는 반드시 break
-        case_str += "            break;\\n"
+        case_str += "            break;"
         event_cases.append(case_str)
 
     # Generate includes, skeletons, etc. for each alias
