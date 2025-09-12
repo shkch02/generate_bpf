@@ -104,7 +104,7 @@ def generate_loader(syscalls):
     aliases = sorted([alias for alias, _ in syscalls])
     bases = sorted(list(set(base for _, base in syscalls)))
 
-    # Generate serialization cases for each unique base syscall
+    # Generate serialization cases for each unique base syscall aaa
     for base in bases:
         upper_base = base.upper()
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
@@ -114,12 +114,14 @@ def generate_loader(syscalls):
         rep_alias = next(alias for alias, b in syscalls if b == base)
         types, arg_names = get_syscall_info(rep_alias)
 
+        ##typ 변수형 리스트를 받아서, 각 typ의 변수형을 반환하는 함수 필요할거 같음 지금 if else로는 제대로 필터링하지 못함 
+
         for typ, var in zip(types, arg_names):
         # JSON 키 부분을 일관되게 생성: ,"<key>":
             key_part = f',\\"{var}\\":'
 
      # 1) 포인터(배열·struct·기타 포인터)인 경우
-            if '[' in typ or ('*' in typ and 'char' not in typ):
+            if '[' in typ or ('*' in typ and 'char' not in typ) or (key_part in ['datap','hdrp','handler']):
              # 실제 멤버 이름은 var + "_ptr"
                 case_str += (             f'            fprintf(f, "{key_part}%llu", '
                     f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
@@ -134,14 +136,14 @@ def generate_loader(syscalls):
                 continue
 
     # 3) long 계열
-            elif typ in ['long', 'ssize_t', 'off_t', 'loff_t', 'time_t']:
+            elif (typ in ['long', 'ssize_t', 'off_t', 'loff_t']) or (key_part in ['time_t','addr','offset','nbytes']):
                 case_str += (
                     f'            fprintf(f, "{key_part}%lld", '
                     f'(long long)e->data.{base}.{var});\n'
                 )
 
     # 4) unsigned long 계열
-            elif typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']:
+            elif (typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']) or (key_part in['mask','ctx_id','cookie']):
                 case_str += (
                     f'            fprintf(f, "{key_part}%llu", '
                     f'(unsigned long long)e->data.{base}.{var});\n'

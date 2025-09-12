@@ -40,6 +40,7 @@ def main():
     print("Generating Makefile and Loader source...")
     generate_makefile(aliases)
     generate_loader(syscalls)
+    #모니터로더 static void fprint_json_escaped_str 함수 인코딩 문제인지 암튼 여기 해결해야함
 
     print("\n✅ Generation complete. Run 'make' to build.")
 
