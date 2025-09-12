@@ -165,11 +165,11 @@ def generate_loader(syscalls):
         attaches.append(textwrap.dedent(f"""
     {alias}_skel = {alias}_monitor_bpf__open_and_load();
     if (!{alias}_skel) {{
-        fprintf(stderr, "Failed to open and load {alias} skeleton\n");
+        fprintf(stderr, "Failed to open and load {alias} skeleton\\n");
         goto cleanup;
     }}
     if ({alias}_monitor_bpf__attach({alias}_skel) != 0) {{
-        fprintf(stderr, "Failed to attach {alias} skeleton\n");
+        fprintf(stderr, "Failed to attach {alias} skeleton\\n");
         goto cleanup;
     }}"""))
         destroys.append(f"    if ({alias}_skel) {alias}_monitor_bpf__destroy({alias}_skel);")
