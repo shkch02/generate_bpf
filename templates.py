@@ -199,7 +199,7 @@ static void serialize_and_send(const struct event_t *e) {{
     FILE *f = open_memstream(&buf, &size);
     if (!f) return;
 
-    fprintf(f, "{{\"type\":\"%s\",\"pid\":%u,\"ts\":%llu", event_type_str[e->type], e->pid, e->ts_ns);
+    fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu"}}, event_type_str[e->type], e->pid, e->ts_ns);
 
     // Event-specific data
     switch (e->type) {{
@@ -232,7 +232,7 @@ int main() {{
     int map_fd = bpf_map__fd({first}_skel->maps.events);
     struct ring_buffer *rb = ring_buffer__new(map_fd, on_event, NULL, NULL);
     if (!rb) {{
-        fprintf(stderr, "Failed to create ring buffer\n");
+        fprintf(stderr, "Failed to create ring buffer\\n");
         goto cleanup;
     }}
 
