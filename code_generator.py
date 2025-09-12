@@ -115,45 +115,47 @@ def generate_loader(syscalls):
         types, arg_names = get_syscall_info(rep_alias)
 
         for typ, var in zip(types, arg_names):
-        # 1) 포인터(배열·struct·기타 포인터)인 경우
+        # JSON 키 부분을 일관되게 생성: ,"<key>":
+            key_part = f',"\\"{var}\\"":'
+
+     # 1) 포인터(배열·struct·기타 포인터)인 경우
             if '[' in typ or ('*' in typ and 'char' not in typ):
-        # 실제 멤버 이름은 var + "_ptr"
-                case_str += (
-                   f'            fprintf(f, ",\\\"{var}\\\":%llu", '
+             # 실제 멤버 이름은 var + "_ptr"
+                case_str += (             f'            fprintf(f, "{key_part}%llu", '
                     f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
                 )
                 continue
 
-    # 2) 문자열(char*)인 경우
+     # 2) 문자열(char*)인 경우
             elif '*' in typ and 'char' in typ:
-                case_str += f'            fprintf(f, ",\"{var}\":\"");\n'
+         # ,"<key>": 를 출력하고, 값은 fprint_json_escaped_str 함수가 ""와 함께 출력
+                case_str += f'            fprintf(f, "{key_part}");\n'
                 case_str += f'            fprint_json_escaped_str(f, e->data.{base}.{var});\n'
-                continue
                 continue
 
     # 3) long 계열
             elif typ in ['long', 'ssize_t', 'off_t', 'loff_t', 'time_t']:
                 case_str += (
-                    f'            fprintf(f, ",\\\"{var}\\\":%lld", '
+                    f'            fprintf(f, "{key_part}%lld", '
                     f'(long long)e->data.{base}.{var});\n'
                 )
 
     # 4) unsigned long 계열
             elif typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']:
-               case_str += (
-                   f'            fprintf(f, ",\\\"{var}\\\":%llu", '
-                   f'(unsigned long long)e->data.{base}.{var});\n'
-               )
+                case_str += (
+                    f'            fprintf(f, "{key_part}%llu", '
+                    f'(unsigned long long)e->data.{base}.{var});\n'
+            )
 
-    # 5) 나머지 정수형
+     # 5) 나머지 정수형
             else:
-               case_str += (
-                   f'            fprintf(f, ",\\\"{var}\\\":%d", '
-                   f'e->data.{base}.{var});\n'
-               )
+                case_str += (
+                    f'            fprintf(f, "{key_part}%d", '
+                    f'e->data.{base}.{var});\n'
+                )
 
-        # 각 case 의 마지막에는 반드시 break
-        case_str += "            break;\n"
+# 각 case 의 마지막에는 반드시 break
+        case_str += "            break;\\n"
         event_cases.append(case_str)
 
     # Generate includes, skeletons, etc. for each alias

@@ -14,11 +14,11 @@ BPF_TEMPLATE = textwrap.dedent("""
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
- struct {{
- __uint(type, BPF_MAP_TYPE_RINGBUF);
- __uint(max_entries, 256 * 1024);
-}} events SEC(".maps");
-                   
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 256 * 1024);
+} events SEC(".maps");
+
 
 SEC("kprobe/__x64_sys_{name}")
 int trace_{name}(struct pt_regs *ctx) {{
@@ -172,13 +172,13 @@ static void fprint_json_escaped_str(FILE *f, const char *s) {{
     }}
     while (*s) {{
         switch (*s) {{
-            case '"': fprintf(f, "\\\""); break;
-            case '\\': fprintf(f, "\\\\"); break;
-            case '\b': fprintf(f, "\\\b"); break;
-            case '\f': fprintf(f, "\\\f"); break;
-            case '\n': fprintf(f, "\\\n"); break;
-            case '\r': fprintf(f, "\\\r"); break;
-            case '\t': fprintf(f, "\\\t"); break;
+            case '"': fprintf(f, "\""); break;
+            case '\\': fprintf(f, "\\"); break;
+            case '\b': fprintf(f, "\\b"); break;
+            case '\f': fprintf(f, "\\f"); break;
+            case '\n': fprintf(f, "\\n"); break;
+            case '\r': fprintf(f, "\\r"); break;
+            case '\t': fprintf(f, "\\t"); break;
             default:
                 if ((unsigned char)*s < 0x20) {{
                     fprintf(f, "\\u%04x", (unsigned char)*s);
@@ -199,7 +199,7 @@ static void serialize_and_send(const struct event_t *e) {{
     FILE *f = open_memstream(&buf, &size);
     if (!f) return;
 
-    fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu", event_type_str[e->type], e->pid, e->ts_ns);
+    fprintf(f, "{{\"type\":\"%s\",\"pid\":%u,\"ts\":%llu", event_type_str[e->type], e->pid, e->ts_ns);
 
     // Event-specific data
     switch (e->type) {{
