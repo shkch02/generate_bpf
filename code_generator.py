@@ -121,7 +121,7 @@ def generate_loader(syscalls):
             key_part = f',\\"{var}\\":'
 
      # 1) 포인터(배열·struct·기타 포인터)인 경우
-            if '[' in typ or ('*' in typ and 'char' not in typ) or (key_part in ['datap','hdrp','handler']):
+            if ('[' in typ or ('*' in typ and 'char' not in typ) or (key_part in ['datap','hdrp','handler'])):
              # 실제 멤버 이름은 var + "_ptr"
                 case_str += (             f'            fprintf(f, "{key_part}%llu", '
                     f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
@@ -136,14 +136,14 @@ def generate_loader(syscalls):
                 continue
 
     # 3) long 계열
-            elif (typ in ['long', 'ssize_t', 'off_t', 'loff_t']) or (key_part in ['time_t','addr','offset','nbytes']):
+            elif ((typ in ['long', 'ssize_t', 'off_t', 'loff_t']) or (key_part in ['time_t','addr','offset','nbytes'])):
                 case_str += (
                     f'            fprintf(f, "{key_part}%lld", '
                     f'(long long)e->data.{base}.{var});\n'
                 )
 
     # 4) unsigned long 계열
-            elif (typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']) or (key_part in['mask','ctx_id','cookie']):
+            elif ((typ in ['unsigned long', 'size_t', 'dev_t', 'ino_t']) or (key_part in['mask','ctx_id','cookie'])):
                 case_str += (
                     f'            fprintf(f, "{key_part}%llu", '
                     f'(unsigned long long)e->data.{base}.{var});\n'
