@@ -232,7 +232,7 @@ int main() {{
     int map_fd = bpf_map__fd({first}_skel->maps.events);
     struct ring_buffer *rb = ring_buffer__new(map_fd, on_event, NULL, NULL);
     if (!rb) {{
-        fprintf(stderr, "Failed to create ring buffer\\n");
+        fprintf(stderr, "Failed to create ring buffer\n");
         goto cleanup;
     }}
 
