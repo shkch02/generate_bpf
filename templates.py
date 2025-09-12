@@ -199,7 +199,7 @@ static void serialize_and_send(const struct event_t *e) {{
     FILE *f = open_memstream(&buf, &size);
     if (!f) return;
 
-    fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu"}}, event_type_str[e->type], e->pid, e->ts_ns);
+    fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu}}", event_type_str[e->type], e->pid, e->ts_ns);
 
     // Event-specific data
     switch (e->type) {{
