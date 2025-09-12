@@ -2,7 +2,7 @@
 import os
 import textwrap
 import templates
-from config import BPF_DIR, OUT_DIR, EVENT_HDR, EVENT_HDR_USER
+from config import BPF_DIR, OUT_DIR, EVENT_HDR, EVENT_HDR_USER, TYPEDEF_TO_UNDERLYING_TYPE
 from utils import get_syscall_info
 from templates import BPF_TEMPLATE, MAKEFILE, LOADER_TEMPLATE, BPF_HEADER, USER_HEADER, STRUCT_TMPL
 
@@ -41,7 +41,7 @@ def make_bindings(name, types, arg_names):
         parm = f"PT_REGS_PARM{idx}(ctx)"
         core = typ.replace('const', '').replace('*', '').split('[')[0].strip()
         is_array = '[' in typ
-        is_ptr   = '*' in typ
+        is_ptr   = '*' in typ or core in TYPEDEF_TO_UNDERLYING_TYPE
 
         # 1) 배열, struct timeval/timespec, 또는 (char* 제외) 포인터
         if core in ('struct timeval','struct timespec') or is_array or (is_ptr and core != 'char'):
@@ -121,7 +121,7 @@ def generate_loader(syscalls):
             key_part = f',\\"{var}\\":'
 
      # 1) 포인터(배열·struct·기타 포인터)인 경우
-            if ('[' in typ or ('*' in typ and 'char' not in typ) or (var in ['datap','hdrp','handler'])):
+            if ('[' in typ or ('*' in typ and ('char' not in typ or 'unsigned' in typ)) or (var in ['datap','hdrp','handler'])):
              # 실제 멤버 이름은 var + "_ptr"
                 case_str += (             f'            fprintf(f, "{key_part}%llu", '
                     f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
@@ -224,7 +224,7 @@ def _generate_common_event_content(targets,template):
         for typ, var in zip(types, arg_names):
             # --- 배열, timeval/timespec, 기타 포인터 먼저 처리 ---
             core = typ.replace('const','').replace('*','').split('[')[0].strip()
-            is_ptr = '*' in typ
+            is_ptr = '*' in typ or core in TYPEDEF_TO_UNDERLYING_TYPE
             if '[' in typ or core in ('struct timeval','struct timespec') or (is_ptr and core != 'char'):
                 fields.append(f"    __u64 {var}_ptr;")
                 continue          

@@ -8,6 +8,7 @@ EVENT_HDR_USER = 'include/common_event_user.h'
 TYPEDEF_TO_UNDERLYING_TYPE = {
     'cap_user_header_t': 'struct __user_cap_header',
     'cap_user_data_t': 'struct __user_cap_data',
+    'sighandler_t': 'void (*)(int)',
 }
 
 MANUAL_MAP = {
