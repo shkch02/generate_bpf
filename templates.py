@@ -14,10 +14,10 @@ BPF_TEMPLATE = textwrap.dedent("""
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
-struct {
+struct {{
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 256 * 1024);
-} events SEC(".maps");
+}} events SEC(".maps");
 
 
 SEC("kprobe/__x64_sys_{name}")
