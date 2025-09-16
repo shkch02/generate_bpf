@@ -8,3 +8,4 @@ temp_syscalls.txt
 ts_ns
 코드 개편안.txt
 vmlinux.h
+man2syscalls.txt
