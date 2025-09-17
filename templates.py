@@ -172,7 +172,7 @@ static void fprint_json_escaped_str(FILE *f, const char *s) {{
     }}
     while (*s) {{
         switch (*s) {{
-            case '"': fprintf(f, "\""); break;
+            case '"': fprintf(f, "\\""); break;
             case '\\\\': fprintf(f, "\\\\\\\\\"); break;
             case '\\b': fprintf(f, "\\\\b\"); break;add
             case '\\f': fprintf(f, "\\\\f\"); break;
