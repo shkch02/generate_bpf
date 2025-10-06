@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ubuntu 22.04 LTS에서 실행
+# ubuntu 22.04 LTS에서 실행  
 
 # --- 다른 모듈에서 필요한 함수들을 가져옵니다 ---
 #man 2 syscall 파싱 함수로 대체필요함
@@ -15,7 +15,7 @@ from code_generator import (
 def main():
     """ 스크립트 메인 실행 함수 """
 
-    # 1. 시스템 콜 분석 및 매핑 정보 생성 
+    # 1. 시스템 콜 분석 및 매핑 정보 생성 json받는걸로 리팩토링할 예정 
     print("Analyzing syscalls and parsing man pages...")
     special_map, syscalls = analyze_syscall()
 
