@@ -181,7 +181,7 @@ def generate_loader(syscalls):
     for i, name in enumerate(syscalls):
         # 'name'은 'close', 'lseek' 등이며, 이들이 'close_skel', 'lseek_skel'의 접두사가 됩니다.
         # rbs[i] = ring_buffer__new(bpf_map__fd(close_skel->maps.events), on_event, NULL, NULL);
-        line = f'    rbs[{i}] = ring_buffer__new(bpf_map__fd({name}_skel->maps.events), on_event, NULL, NULL);'
+        line = f'    rbs[{i}] = ring_buffer__new(bpf_map__fd({alias}_skel->maps.events), on_event, NULL, NULL);'
         rbs_initializers.append(line)
 
 

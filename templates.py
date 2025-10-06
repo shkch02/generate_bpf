@@ -236,19 +236,19 @@ int main() {{
 
     for (int i = 0; i < {num_syscalls}; i++) {{
     if (!rbs[i]) {{
-        fprintf(stderr, "Failed to create ring buffer for syscall %d\n", i);
+        fprintf(stderr, "Failed to create ring buffer for syscall %d\\n", i);
         goto cleanup;
         }}
     }}
 
 
 
-   printf("Monitoring syscalls... Press Ctrl+C to exit.\n\n");
+   printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
     while (running) {{
         for (int i = 0; i < {num_syscalls}; i++) {{
             // non-blocking으로 모든 버퍼를 빠르게 순회하기 위해 timeout을 짧게 설정 (예: 1ms)
             if (ring_buffer__poll(rbs[i], 1) < 0) {{
-                fprintf(stderr, "Error polling ring buffer %d\n", i);
+                fprintf(stderr, "Error polling ring buffer %d\\n", i);
                 break; // 에러 발생 시 외부 루프도 종료
             }}
         }}
