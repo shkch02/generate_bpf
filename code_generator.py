@@ -185,14 +185,13 @@ def generate_loader(syscalls):
         rbs_initializers.append(line)
 
 
-    rbs_initializers_string = '\n'.join(rbs_initializers)
 
     loader = LOADER_TEMPLATE.format(
         includes='\n'.join(includes),
         skeletons='\n'.join(skeletons),
         attaches='\n'.join(attaches),
         destroys='\n'.join(destroys),
-        rbs_initializers=rbs_initializers_string,
+        rbs_initializers='\n'.join(rbs_initializers),
         num_syscalls=len(syscalls),
         event_cases='\n'.join(event_cases),
         enum_strings='\n'.join(enum_strings)
