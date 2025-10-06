@@ -163,7 +163,7 @@ static void kafka_send(const char* buffer, size_t len) {{
     // Poll for delivery reports (and other events).
     rd_kafka_poll(rk, 0);
                                   
-    //printf("%s\n", buffer);
+    //printf("%s\\n", buffer);
 }}
 
 static void fprint_json_escaped_str(FILE *f, const char *s) {{
@@ -229,7 +229,7 @@ int main() {{
     kafka_init();
 
     {skeletons}
-    struct ring_buffer *rbs[{num_syscalls}]
+    struct ring_buffer *rbs[{num_syscalls}];
     {attaches}
                                   
     {rbs_initializers}
