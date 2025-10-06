@@ -162,6 +162,8 @@ static void kafka_send(const char* buffer, size_t len) {{
     rd_kafka_produce(rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, (void*)buffer, len, NULL, 0, NULL);
     // Poll for delivery reports (and other events).
     rd_kafka_poll(rk, 0);
+                                  
+    //printf("%s\n", buffer);
 }}
 
 static void fprint_json_escaped_str(FILE *f, const char *s) {{
@@ -227,7 +229,17 @@ int main() {{
     kafka_init();
 
     {skeletons}
+    struct ring_buffer *rbs[{num_syscalls}]
     {attaches}
+                                  
+    {rbs_initializers}
+
+    for (int i = 0; i < {num_syscalls}; i++) {{
+    if (!rbs[i]) {{
+        fprintf(stderr, "Failed to create ring buffer for syscall %d\n", i);
+        goto cleanup;
+        }}
+    }}
 
     int map_fd = bpf_map__fd({first}_skel->maps.events);
     struct ring_buffer *rb = ring_buffer__new(map_fd, on_event, NULL, NULL);
@@ -236,14 +248,18 @@ int main() {{
         goto cleanup;
     }}
 
-    printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
+   printf("Monitoring syscalls... Press Ctrl+C to exit.\n\n");
     while (running) {{
-        if (ring_buffer__poll(rb, 100) < 0) {{
-            fprintf(stderr, "Error polling ring buffer\\n");
-            break;
+        for (int i = 0; i < {num_syscalls}; i++) {{
+            // non-blocking으로 모든 버퍼를 빠르게 순회하기 위해 timeout을 짧게 설정 (예: 1ms)
+            if (ring_buffer__poll(rbs[i], 1) < 0) {{
+                fprintf(stderr, "Error polling ring buffer %d\n", i);
+                break; // 에러 발생 시 외부 루프도 종료
+            }}
         }}
-        // Poll Kafka regularly to serve delivery reports and other callbacks.
-        rd_kafka_poll(rk, 0);
+        //rd_kafka_poll(rk, 0);
+        // CPU 사용을 줄이기 위해 잠시 대기
+        usleep(1000);
     }}
 
 cleanup:
