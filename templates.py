@@ -258,9 +258,9 @@ int main() {{
     }}
 
 cleanup:
-    for (int i = 0; i < {num_syscalls}; i++) {
+    for (int i = 0; i < {num_syscalls}; i++) {{
         ring_buffer__free(rbs[i]);
-    }
+    }}
     {destroys}
     fprintf(stderr, "\\nFlushing final Kafka messages...\\n");
     rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
