@@ -241,12 +241,7 @@ int main() {{
         }}
     }}
 
-    int map_fd = bpf_map__fd({first}_skel->maps.events);
-    struct ring_buffer *rb = ring_buffer__new(map_fd, on_event, NULL, NULL);
-    if (!rb) {{
-        fprintf(stderr, "Failed to create ring buffer\\n");
-        goto cleanup;
-    }}
+
 
    printf("Monitoring syscalls... Press Ctrl+C to exit.\n\n");
     while (running) {{
