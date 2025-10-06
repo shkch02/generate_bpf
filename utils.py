@@ -155,9 +155,14 @@ def get_syscall_info(syscall_name):
     types, arg_names = get_proto(syscall_name)
     return types, arg_names
 
-# --- REFACTOR: syscall 분석 및 자동 매핑하여 syscalls,specail maps 리턴 ---
-def analyze_syscall():
-    # 1) /proc/kallsyms 에서 __x64_sys_* 심볼 추출
+# --- REFACTORED & COMBINED: 두 함수의 장점을 결합한 최종 분석 함수 ---
+def analyze_syscalls_from_list(target_syscalls):
+    """
+    사용자가 제공한 시스템 콜 목록을 기반으로 커널 심볼을 찾고,
+    매핑 정보를 생성하며, 찾지 못한 심볼은 사용자에게 알려줍니다.
+    """
+    # 1) /proc/kallsyms 에서 커널 심볼을 한 번만 읽어 Set으로 만듭니다.
+    print("Reading kernel symbols from /proc/kallsyms...")
     try:
         with open("/proc/kallsyms") as f:
             kernel_syms = {
@@ -169,35 +174,52 @@ def analyze_syscall():
         print("[ERROR] /proc/kallsyms not found. Are you running on Linux?")
         return {}, []
 
-    # 2) man 페이지에서 syscall 이름들 뽑기
-    syscalls_from_man = parse_man()
-    if not syscalls_from_man:
-        print("[ERROR] Could not get syscall list. Aborting.")
-        return {}, []
-        
-    user_space_syscalls = {name for name, _ in syscalls_from_man}
+    # --- 분석 결과를 저장할 변수들 ---
+    user_space_syscalls = sorted(list(set(target_syscalls))) # 입력 목록 (중복제거, 정렬)
+    final_syscalls = []      # 최종 처리될 (alias, base) 튜플 리스트
+    final_special_map = {}   # 최종 special_map
+    
+    # --- 매칭되지 않은 심볼을 찾기 위한 과정 ---
+    # 2) 커널 심볼과 일치하지 않는 사용자 공간 심볼 목록(missing)을 찾습니다.
+    missing = [name for name in user_space_syscalls if name not in kernel_syms]
 
-    # 3) 커널에 없는 것들
-    missing = sorted(user_space_syscalls - kernel_syms)
-
-    # 4) 자동 후보 추론
+    # 3) 자동 후보 추론 (auto_map 생성)
     auto_map = {}
     for name in missing:
-        cand = name.lstrip('_')  # 앞 언더바 제거
-        for suffix in ('time32','time64','32','64'):
+        # MANUAL_MAP에 이미 정의된 경우는 건너뜁니다.
+        if name in MANUAL_MAP:
+            continue
+            
+        cand = name.lstrip('_')
+        for suffix in ('time32', 'time64', '32', '64'):
             if cand.endswith(suffix):
                 cand = cand[:-len(suffix)]
+        
         if cand in kernel_syms:
             auto_map[name] = cand
 
+    # 4) 최종 special_map을 생성합니다. (수동 + 자동)
     final_special_map = MANUAL_MAP.copy()
     final_special_map.update(auto_map)
-    
-    # 5) 이제 남은 것들(수동 매핑 필요)만 다시 계산
-    remaining = [n for n in missing if n not in auto_map and n not in MANUAL_MAP]
+
+    # 5) 최종적으로 처리할 시스템 콜 목록(final_syscalls)을 만듭니다.
+    for name in user_space_syscalls:
+        # 커널에 심볼이 그대로 있는 경우
+        if name in kernel_syms:
+            final_syscalls.append((name, name))
+        # special_map (수동 또는 자동)에 매핑 정보가 있는 경우
+        elif name in final_special_map:
+            final_syscalls.append((name, final_special_map[name]))
+        # 매칭되는 심볼이 전혀 없는 경우 (이 경우는 건너뜀)
+        else:
+            continue
+
+    # 6) 사용자에게 매핑 결과와 수동 매핑이 필요한 목록을 출력합니다.
+    remaining = [n for n in missing if n not in final_special_map]
 
     if remaining:
-        print("\n=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===") #여기에 지금 break 들어가고 있음
+        print("\n=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===")
+        print("# 아래 시스템 콜은 커널 심볼을 찾지 못했습니다. config.py의 MANUAL_MAP에 추가해야 할 수 있습니다.")
         for name in remaining:
             print(f"    '{name}': '???',")
         print("==============================================\n")
@@ -207,5 +229,10 @@ def analyze_syscall():
         for k, v in auto_map.items():
             print(f"    '{k}': '{v}',")
         print("=========================================\n")
+    
+    if not final_syscalls:
+        print("\n[ERROR] No valid syscalls could be processed from the input list. Aborting.")
+        return {}, []
 
-    return final_special_map, syscalls_from_man
+    print(f"Successfully processed {len(final_syscalls)} syscalls.")
+    return final_special_map, final_syscalls

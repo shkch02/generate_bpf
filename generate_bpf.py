@@ -17,7 +17,7 @@ def main():
 
     # 1. 시스템 콜 분석 및 매핑 정보 생성 json받는걸로 리팩토링할 예정 
     print("Analyzing syscalls and parsing man pages...")
-    special_map, syscalls = analyze_syscall()
+    special_map, syscalls = analyze_syscall_from_List(target_syscalls)
 
     if not syscalls:
         print("\n[ERROR] Could not retrieve syscall list. Aborting.")
