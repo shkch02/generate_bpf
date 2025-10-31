@@ -32,7 +32,7 @@ makefile 또한 자동으로 생성되기에  make명령을 통해 간단히 컴
 # 4. 사용 방법
 1. JSON형식 시스템콜 목록 준비
 ```JSON
- {
+{
     "open",
     "close",
     "read",
@@ -42,5 +42,22 @@ makefile 또한 자동으로 생성되기에  make명령을 통해 간단히 컴
 }
 ```
 [참고] extract_syscalls.py 스크립트를 이용하면 man syscalls를 이용하여 해당 시스템의 모든 시스템콜 목록을 추출할 수 있습니다
-2. 
-3. 
+2. eBPF 코드 생성
+```bash
+python3 generate_bpf.py -f syscalls.json
+```
+실행이 완료되면 다음과 같은 파일이 생성됩니다
+
+* bpf/ : 각 시스템콜 별 .bpf.c 코드 저장
+* inlcude/ : 공통헤더
+* monitor_loader.c : 사용자 공간로더
+* makefile
+  
+3. make명령어 실행
+컴파일 성공하면 monitor_loader 실행파일이 생성됩니다
+
+4. monitor_loader 실행
+   ```bash
+sudo ./monitor_loader
+```
+을 통해 실행파일 실행하면 해당 환경에서 컨테이너가 호출하는 특정 시스템콜 목록을 출력합니다
