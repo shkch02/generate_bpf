@@ -31,13 +31,14 @@ makefile 또한 자동으로 생성되기에  make명령을 통해 간단히 컴
 
 # 4. 사용 방법
 1. JSON형식 시스템콜 목록 준비
- ''' {
+```JSON
+ {
     "open",
     "close",
     "read",
     "write",
     "lseek",
     "mmap"
-   }'''
+   }
 
 3. 
