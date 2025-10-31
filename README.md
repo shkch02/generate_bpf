@@ -39,7 +39,8 @@ makefile 또한 자동으로 생성되기에  make명령을 통해 간단히 컴
     "write",
     "lseek",
     "mmap"
-}```
+}
+```
 [참고] extract_syscalls.py 스크립트를 이용하면 man syscalls를 이용하여 해당 시스템의 모든 시스템콜 목록을 추출할 수 있습니다
 2. 
 3. 
