@@ -29,3 +29,15 @@ makefile 또한 자동으로 생성되기에  make명령을 통해 간단히 컴
   * bpftool
 * **커널 헤더** : BTF정보과 활성화된 커널 (/sys/kernel/btf/vmlinux <-해당 파일 필요함)
 
+# 4. 사용 방법
+1. JSON형식 시스템콜 목록 준비
+ ''' {
+    "open",
+    "close",
+    "read",
+    "write",
+    "lseek",
+    "mmap"
+   }'''
+
+3. 
