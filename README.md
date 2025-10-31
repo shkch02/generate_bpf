@@ -37,4 +37,50 @@ makefile 또한 자동으로 생성되기에  make명령을 통해 간단히 컴
     "close",
     "read",
     "write",
-    "lseek"스
+    "lseek"
+}
+```
+[참고] extract_syscalls.py 스크립트를 사용하여 man syscalls(2) 페이지에서 범용 시스템 콜 목록을 추출할 수 있습니다.
+
+#### 2. eBPF 코드 생성
+```bash
+python3 generate_bpf.py -f syscalls.json
+```
+
+실행이 완료되면 실행한 디렉터리 내부에 다음과 같은 파일들이 생성됩니다.
+
+* bpf/: 각 시스템 콜별 .bpf.c 파일
+
+* include/: 공통 헤더 파일
+
+* monitor_loader.c: 사용자 공간 로더
+
+* Makefile
+
+#### 3. make실행
+makefile이 존재하는 디렉토리에서 make,
+
+성공하면 monitor_loader 실행파일 생성
+
+#### 4. monitor_loader 실행
+```bash
+sudo ./monitor_loader
+```
+으로 모니터 실행하면, 해당 os에서 컨테이너가 실행하는 시스템콜중 1단계에서 입력한 시스템콜 호출시 로그 출력
+
+## 5. 프로젝트 구조
+```
+.
+├── generate_bpf.py       # (메인) 코드 생성기 실행 스크립트
+├── code_generator.py     # (모듈) 실제 C 코드 및 Makefile 생성 로직
+├── utils.py              # (모듈) 시스템 콜 정보 파싱 등 유틸리티 함수
+├── templates.py          # (모듈) C 코드 및 Makefile 템플릿
+├── config.py             # (모듈) 출력 디렉터리 등 설정
+├── extract_syscalls.py   # (유틸) man 페이지에서 시스템 콜 목록 추출
+└── syscalls.json         # (입력) 사용자가 작성하는 시스템 콜 목록
+```
+
+## 6. 향후 개선 사항
+
+## 7. 라이센스
+
