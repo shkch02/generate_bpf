@@ -41,6 +41,7 @@ makefile 또한 자동으로 생성되기에  make명령을 통해 간단히 컴
 }
 ```
 [참고] extract_syscalls.py 스크립트를 사용하여 man syscalls(2) 페이지에서 범용 시스템 콜 목록을 추출할 수 있습니다.
+[참고] elf파일 받아 호출하는 시스템콜 분석하여 JSON으로 출력하는 프로그램(https://github.com/shkch02/ips_bpf)
 
 #### 2. eBPF 코드 생성
 ```bash
