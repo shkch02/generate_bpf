@@ -53,7 +53,7 @@ int trace_{name}(struct pt_regs *ctx) {{
         return 0;
 
     /* 이하 eBPF 이벤트 생성 코드 계속… */
-    struct event_t *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
+    struct event_t *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0); // 이벤트 버퍼 예약
     if (!e)
         return 0;
     e->pid   = bpf_get_current_pid_tgid() >> 32;
