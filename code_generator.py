@@ -38,12 +38,12 @@ KERNEL_TYPE_MAP = {
 def make_bindings(name, types, arg_names):
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
-        parm = f"PT_REGS_PARM{idx}(ctx)"
+        parm = f"ctx->args[{idx-1}]"
         core = typ.replace('const', '').replace('*', '').split('[')[0].strip()
         is_array = '[' in typ
         is_ptr   = '*' in typ or core in TYPEDEF_TO_UNDERLYING_TYPE
 
-        # 1) 배열, struct timeval/timespec, 또는 (char* 제외) 포인터
+        # 1) 배열, struct timeval/timespec, 또는 (char* 제외) 포인터 -> 주소값을 읽어온다.(구조체)
         if core in ('struct timeval','struct timespec') or is_array or (is_ptr and core != 'char'):
             lines.append(f"    e->data.{name}.{var}_ptr = (u64){parm};")
             continue
@@ -71,10 +71,7 @@ def generate_bpf_sources(syscalls,special_map):
     """ CSV와 템플릿을 기반으로 다수의 .bpf.c 파일을 생성 """
     os.makedirs(BPF_DIR, exist_ok=True)
     for alias, base in syscalls:
-        if alias in special_map:
-            hook_name = special_map[alias]
-        else:
-            hook_name = alias
+        hook_name = alias
         types, arg_names = get_syscall_info(alias)
         
         code = BPF_TEMPLATE.format(
@@ -123,7 +120,7 @@ def generate_loader(syscalls):
      # 1) 포인터(배열·struct·기타 포인터)인 경우
             if ('[' in typ or ('*' in typ and ('char' not in typ or 'unsigned' in typ)) or (var in ['datap','hdrp','handler'])):
              # 실제 멤버 이름은 var + "_ptr"
-                case_str += (             f'            fprintf(f, "{key_part}%llu", '
+                case_str += (             f'            fprintf(f, "{key_part}0x%llx", '
                     f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
                 )
                 continue
