@@ -99,7 +99,7 @@ monitor_loader: monitor_loader.c
 	-lbpf -lrdkafka -lpthread
 
 clean:
-	rm -f *.bpf.o *.skel.h monitor_loader
+	rm -f ./bpf/*.bpf.o ./bpf/*.skel.h monitor_loader
 """)
 
 
