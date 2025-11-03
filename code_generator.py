@@ -120,7 +120,7 @@ def generate_loader(syscalls):
      # 1) 포인터(배열·struct·기타 포인터)인 경우
             if ('[' in typ or ('*' in typ and ('char' not in typ or 'unsigned' in typ)) or (var in ['datap','hdrp','handler'])):
              # 실제 멤버 이름은 var + "_ptr"
-                case_str += (             f'            fprintf(f, "{key_part}%llu", '
+                case_str += (             f'            fprintf(f, "{key_part}0x%llx", '
                     f'(unsigned long long)e->data.{base}.{var}_ptr);\n'
                 )
                 continue
