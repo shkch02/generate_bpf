@@ -3,9 +3,6 @@ import textwrap
 
 BPF_TEMPLATE = textwrap.dedent("""
 #define __TARGET_ARCH_x86
-#ifndef PT_REGS_PARM6
-#define PT_REGS_PARM6(ctx) ((ctx)->r9)
-#endif
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
@@ -20,8 +17,8 @@ struct {{
 }} events SEC(".maps");
 
 
-SEC("kprobe/__x64_sys_{name}")
-int trace_{name}(struct pt_regs *ctx) {{
+SEC("tracepoint/syscalls/sys_enter_{name}")
+int trace_{name}(struct trace_event_raw_sys_enter *ctx) {{
     char comm[16];
     bpf_get_current_comm(&comm, sizeof(comm));
 
