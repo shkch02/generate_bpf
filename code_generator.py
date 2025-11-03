@@ -176,12 +176,21 @@ def generate_loader(syscalls):
     }}"""))
         destroys.append(f"    if ({alias}_skel) {alias}_monitor_bpf__destroy({alias}_skel);")
 
+
+    rbs_initializers = []
+    for i, name in enumerate(syscalls):
+        # 'name'은 'close', 'lseek' 등이며, 이들이 'close_skel', 'lseek_skel'의 접두사가 됩니다.
+        # rbs[i] = ring_buffer__new(bpf_map__fd(close_skel->maps.events), on_event, NULL, NULL);
+        line = f'    rbs[{i}] = ring_buffer__new(bpf_map__fd({alias}_skel->maps.events), on_event, NULL, NULL);'
+        rbs_initializers.append(line)
+
     loader = LOADER_TEMPLATE.format(
         includes='\n'.join(includes),
         skeletons='\n'.join(skeletons),
         attaches='\n'.join(attaches),
         destroys='\n'.join(destroys),
-        first=aliases[0],
+        rbs_initializers='\n'.join(rbs_initializers),
+        num_syscalls=len(syscalls),
         event_cases='\n'.join(event_cases),
         enum_strings='\n'.join(enum_strings)
     )
