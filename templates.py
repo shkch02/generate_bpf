@@ -298,7 +298,7 @@ struct event_t {{
         union {{
     {union_entries}
         }} data;
-    }};
+    }}__attribute__((packed));
     """)
 
 USER_HEADER = textwrap.dedent("""
@@ -399,11 +399,11 @@ typedef unsigned long      aio_context_t;
         union {{
     {union_entries}
         }} data;
-    }};
+    }}__attribute__((packed));
     """)
 
 STRUCT_TMPL = textwrap.dedent("""
     struct {name}_event_t {{
     {fields}
-    }};
+    }}__attribute__((packed));
 """)
