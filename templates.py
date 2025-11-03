@@ -113,14 +113,14 @@ LOADER_TEMPLATE = textwrap.dedent("""
 #include <signal.h>
 #include <unistd.h>
 #include <bpf/libbpf.h>
-#include <librdkafka/rdkafka.h>
+//#include <librdkafka/rdkafka.h>
 #include "include/common_event_user.h"
 {includes} 
 // bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 
 static volatile bool running = true;
-static rd_kafka_t *rk;
-static rd_kafka_topic_t *rkt;
+//static rd_kafka_t *rk;
+//static rd_kafka_topic_t *rkt;
 static const char *event_type_str[] = {{
 {enum_strings}
     }};
@@ -131,7 +131,7 @@ void sig_handler(int sig) {{
 }}
 
 // IMPROVEMENT: Kafka delivery report callback
-static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
+/*static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
     if (rkmessage->err) {{
         fprintf(stderr, " Message delivery failed: %s\\n", rd_kafka_err2str(rkmessage->err));
     }}
@@ -164,6 +164,10 @@ static void kafka_send(const char* buffer, size_t len) {{
     rd_kafka_poll(rk, 0);
                                   
     //printf("%s\\n", buffer);
+}}*/
+static void stdout_send(const char* buffer, size_t len) {{
+    if (!buffer || len == 0) return;
+    printf("%s\\n", buffer);
 }}
 
 static void fprint_json_escaped_str(FILE *f, const char *s) {{
@@ -226,7 +230,7 @@ int main() {{
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
 
-    kafka_init();
+    //kafka_init();
 
     {skeletons}
     struct ring_buffer *rbs[{num_syscalls}];
@@ -243,7 +247,7 @@ int main() {{
 
 
 
-   printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
+  /* printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
     while (running) {{
         for (int i = 0; i < {num_syscalls}; i++) {{
             // non-blocking으로 모든 버퍼를 빠르게 순회하기 위해 timeout을 짧게 설정 (예: 1ms)
@@ -255,7 +259,21 @@ int main() {{
         //rd_kafka_poll(rk, 0);
         // CPU 사용을 줄이기 위해 잠시 대기
         usleep(1000);
-    }}
+    }} */
+
+printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
+    while (running) {{
+        for (int i = 0; i < {num_syscalls}; i++) {{
+            // non-blocking으로 모든 버퍼를 빠르게 순회하기 위해 timeout을 짧게 설정 (예: 1ms)
+            if (ring_buffer__poll(rbs[i], 1) < 0) {{
+                fprintf(stderr, "Error polling ring buffer %d\\n", i);
+                break; // 에러 발생 시 외부 루프도 종료
+            }}
+        }}
+        // CPU 사용을 줄이기 위해 잠시 대기
+        usleep(1000);
+   }}
+
 
 cleanup:
     for (int i = 0; i < {num_syscalls}; i++) {{
