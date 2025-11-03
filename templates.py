@@ -279,14 +279,21 @@ cleanup:
     for (int i = 0; i < {num_syscalls}; i++) {{
         ring_buffer__free(rbs[i]);
     }}
-    {destroys}
-    fprintf(stderr, "\\nFlushing final Kafka messages...\\n");
-    rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
-    rd_kafka_topic_destroy(rkt);
-    rd_kafka_destroy(rk);
+    //ring_buffer__free(rb); //===================변경
+    if (close_skel) close_monitor_bpf__destroy(close_skel);
+    if (lseek_skel) lseek_monitor_bpf__destroy(lseek_skel);
+    if (open_skel) open_monitor_bpf__destroy(open_skel);
+    if (read_skel) read_monitor_bpf__destroy(read_skel);
+    if (write_skel) write_monitor_bpf__destroy(write_skel);
+    // 4. 최종 Kafka 메시지 관련 코드 제거
+    // fprintf(stderr, "\\nFlushing final Kafka messages...\\n");
+    // rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
+    // rd_kafka_topic_destroy(rkt);
+    // rd_kafka_destroy(rk);
     printf("Cleaned up resources.\\n");
     return 0;
 }}
+
 """)
 
 BPF_HEADER = textwrap.dedent("""
