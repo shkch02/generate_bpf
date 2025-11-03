@@ -217,7 +217,7 @@ static void serialize_and_send(const struct event_t *e) {{
     fprintf(f, "}}");
     fclose(f);
 
-    kafka_send(buf, size);
+    stdout_send(buf, size);
     free(buf);
 }}
 
