@@ -272,6 +272,7 @@ cleanup:
 """)
 
 BPF_HEADER = textwrap.dedent("""
+//common_event.h
 #pragma once
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
@@ -301,6 +302,7 @@ struct event_t {{
     """)
 
 USER_HEADER = textwrap.dedent("""
+//common_event_user.h
 #pragma once
 
 /* 1) 필수 헤더 */
