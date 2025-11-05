@@ -206,7 +206,7 @@ def generate_loader(syscalls):
         rbs_initializers='\n'.join(rbs_initializers),
         num_syscalls=len(syscalls),
         event_cases='\n'.join(event_cases),
-        enum_strings='\n'.join(enum_strings)
+        enum_strings='\n'.join(enum_strings),
         cgroup_scanner_init=cgroup_scanner_init_code,  # [추가]
         cgroup_scanner_join=cgroup_scanner_join_code  # [추가]
     )
