@@ -163,7 +163,7 @@ static void kafka_send(const char* buffer, size_t len) {{
 
 /* [추가] Cgroup 스캔 콜백 함수 (PoC 로직) */
 static int dir_scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {{
-    if (g_map_fd[0] < 0) return -1; // 맵이 준비되지 않음
+    if (g_map_fds[0] < 0) return -1; // 맵이 준비되지 않음
 
     if (typeflag == FTW_D) {{
         if (strstr(fpath, "kubepods") || strstr(fpath, "docker-")) {{
