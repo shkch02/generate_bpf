@@ -39,12 +39,12 @@ def main():
         print(f"\n[ERROR] Invalid or malformed JSON file: {e}")
         return
 
-    # 2. 시스템 콜 분석 및 매핑 정보 생성 json받는걸로 리팩토링할 예정 
+    # 2. TODO : open - openat 등으로 매핑을
     print("Analyzing syscalls and parsing man pages...")
     special_map, syscalls = analyze_syscalls_from_list(target_syscalls)
 
     if not syscalls:
-        print("\n[ERROR] Could not retrieve syscall list. Aborting.")
+        print("\n[ERROR] Could not retrieve syscall list. Aborting. ")
         return
 
     # 3. 생성할 타겟 목록 정리 (별칭과 기본 이름 분리)
