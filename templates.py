@@ -115,7 +115,7 @@ LOADER_TEMPLATE = textwrap.dedent("""
 static volatile bool running = true;
 static rd_kafka_t *rk;
 static rd_kafka_topic_t *rkt;
-static int g_map_fd = -1;
+static int g_map_fd[{num_syscalls}] = {num_0f_minus1s}; 
 static const char *event_type_str[] = {{
 {enum_strings}
     }};
@@ -163,7 +163,7 @@ static void kafka_send(const char* buffer, size_t len) {{
 
 /* [추가] Cgroup 스캔 콜백 함수 (PoC 로직) */
 static int dir_scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {{
-    if (g_map_fd < 0) return -1; // 맵이 준비되지 않음
+    if (g_map_fd[0] < 0) return -1; // 맵이 준비되지 않음
 
     if (typeflag == FTW_D) {{
         if (strstr(fpath, "kubepods") || strstr(fpath, "docker-")) {{
@@ -180,7 +180,7 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
                                   
 /* [추가] Cgroup 스캐너 스레드 함수 (PoC 로직) */
 void *scanner_thread(void *arg) {{
-    if (g_map_fd < 0) {{
+    if (g_map_fd[0] < 0) {{
         fprintf(stderr, "Scanner thread received invalid map FD\\n");
         return NULL;
     }}

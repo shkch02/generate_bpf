@@ -177,18 +177,44 @@ def generate_loader(syscalls):
     cgroup_scanner_init_code = ""
     cgroup_scanner_join_code = ""
     if aliases: # syscall 목록이 하나라도 있을 때만 스레드 생성
-        first_skel_name = aliases[0] + "_skel"
-        cgroup_scanner_init_code = textwrap.dedent(f"""
-    pthread_t tid;
-    g_map_fd = bpf_map__fd({first_skel_name}->maps.cgroup_map);
-    if (g_map_fd < 0) {{
-        fprintf(stderr, "Failed to get cgroup_map FD\\n");
-        goto cleanup;
-    }}
+        
+        # C 코드를 담을 리스트
+        init_lines = [
+            "    pthread_t tid;"
+        ]
+
+        # [수정] 
+        # aliases 리스트를 순회하며 5개의 맵 FD를 모두 가져오는 C 코드를 생성
+        # 예: g_map_fds[0] = bpf_map__fd(close_skel->maps.cgroup_map);
+        #     g_map_fds[1] = bpf_map__fd(lseek_skel->maps.cgroup_map);
+        #     ...
+        for i, alias in enumerate(aliases):
+            skel_name = f"{alias}_skel"
+            init_lines.append(f"    g_map_fds[{i}] = bpf_map__fd({skel_name}->maps.cgroup_map);")
+
+        # [수정] 
+        # 5개 맵 FD가 모두 유효한지 확인하는 C 코드 추가
+        init_lines.append(textwrap.dedent(f"""
+    /* [추가] {len(aliases)}개 맵 FD가 모두 유효한지 확인 */
+    for (int i = 0; i < {len(aliases)}; i++) {{
+        if (g_map_fds[i] < 0) {{
+            fprintf(stderr, "Failed to get cgroup_map FD for skeleton index %d\\n", i);
+            goto cleanup;
+        }}
+    }}"""))
+
+        # [수정]
+        # 스레드를 생성하는 C 코드 추가 (기존 g_map_fd < 0 검사 로직은 위에서 대체됨)
+        init_lines.append(textwrap.dedent("""
     if (pthread_create(&tid, NULL, scanner_thread, NULL) != 0) {{
         fprintf(stderr, "Failed to create scanner thread\\n");
         goto cleanup;
-    }}""")
+    }}"""))
+        
+        # 생성된 모든 C 코드 라인을 하나의 문자열로 합칩니다.
+        cgroup_scanner_init_code = "\n".join(init_lines)
+        
+        # 스레드 조인 코드는 동일합니다.
         cgroup_scanner_join_code = "    pthread_join(tid, NULL);"
 
     rbs_initializers = []
@@ -208,7 +234,8 @@ def generate_loader(syscalls):
         event_cases='\n'.join(event_cases),
         enum_strings='\n'.join(enum_strings),
         cgroup_scanner_init=cgroup_scanner_init_code,  # [추가]
-        cgroup_scanner_join=cgroup_scanner_join_code  # [추가]
+        cgroup_scanner_join=cgroup_scanner_join_code,  # [추가]
+        num_0f_minus1s=','.join(['-1'] * len(syscalls))  # [추가]
     )
     with open(os.path.join(OUT_DIR, 'monitor_loader.c'), 'w') as f:
         f.write(loader)
