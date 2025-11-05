@@ -185,7 +185,7 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
                                   
 /* [추가] Cgroup 스캐너 스레드 함수 (PoC 로직) */
 void *scanner_thread(void *arg) {{
-    if (g_map_fd[0] < 0) {{
+    if (g_map_fds[0] < 0) {{
         fprintf(stderr, "Scanner thread received invalid map FD\\n");
         return NULL;
     }}
