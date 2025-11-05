@@ -115,7 +115,7 @@ LOADER_TEMPLATE = textwrap.dedent("""
 static volatile bool running = true;
 static rd_kafka_t *rk;
 static rd_kafka_topic_t *rkt;
-static int g_map_fd[{num_syscalls}] = {{{num_0f_minus1s}}}; 
+static int g_map_fds[{num_syscalls}] = {{{num_0f_minus1s}}}; 
 static const char *event_type_str[] = {{
 {enum_strings}
     }};
@@ -170,9 +170,14 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
             __u64 cgroup_id = sb->st_ino;
             __u8 value = 1;
 
-            if (bpf_map_update_elem(g_map_fd, &cgroup_id, &value, BPF_ANY) != 0) {{
-                // fprintf(stderr, "Failed to update map for cgroup %s (ID: %llu): %s\\n", fpath, cgroup_id, strerror(errno));
-            }}
+            /* [수정] 5개의 맵을 모두 순회하며 업데이트 */
+            for (int i = 0; i < {num_syscalls}; i++) {{
+                if (g_map_fds[i] < 0) continue; // 유효한 FD인지 확인
+                
+                // [수정] g_map_fds[i] (배열 요소)를 전달
+                if (bpf_map_update_elem(g_map_fds[i], &cgroup_id, &value, BPF_ANY) != 0) {
+                    // fprintf(stderr, "Failed to update map[%d] for cgroup %s (ID: %llu): %s\\n", i, fpath, cgroup_id, strerror(errno));
+                }}
         }}
     }}
     return 0; // 계속 스캔
