@@ -175,7 +175,7 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
                 if (g_map_fds[i] < 0) continue; // 유효한 FD인지 확인
                 
                 // [수정] g_map_fds[i] (배열 요소)를 전달
-                if (bpf_map_update_elem(g_map_fds[i], &cgroup_id, &value, BPF_ANY) != 0) {
+                if (bpf_map_update_elem(g_map_fds[i], &cgroup_id, &value, BPF_ANY) != 0) {{
                     // fprintf(stderr, "Failed to update map[%d] for cgroup %s (ID: %llu): %s\\n", i, fpath, cgroup_id, strerror(errno));
                 }}
         }}
