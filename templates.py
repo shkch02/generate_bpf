@@ -178,6 +178,7 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
                 if (bpf_map_update_elem(g_map_fds[i], &cgroup_id, &value, BPF_ANY) != 0) {{
                     // fprintf(stderr, "Failed to update map[%d] for cgroup %s (ID: %llu): %s\\n", i, fpath, cgroup_id, strerror(errno));
                 }}
+            }}
         }}
     }}
     return 0; // 계속 스캔
