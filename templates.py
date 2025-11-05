@@ -91,7 +91,8 @@ clean:
 # IMPROVEMENT: Kafka 관련 로직 개선 및 에러 처리 추가
 #bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 LOADER_TEMPLATE = textwrap.dedent("""
-                                  
+#define _XOPEN_SOURCE 500
+       
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
