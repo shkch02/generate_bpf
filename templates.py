@@ -115,7 +115,7 @@ LOADER_TEMPLATE = textwrap.dedent("""
 static volatile bool running = true;
 static rd_kafka_t *rk;
 static rd_kafka_topic_t *rkt;
-static int g_map_fd[{num_syscalls}] = {num_0f_minus1s}; 
+static int g_map_fd[{num_syscalls}] = {{{num_0f_minus1s}}}; 
 static const char *event_type_str[] = {{
 {enum_strings}
     }};
