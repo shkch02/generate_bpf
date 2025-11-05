@@ -173,12 +173,29 @@ def generate_loader(syscalls):
     }}"""))
         destroys.append(f"    if ({alias}_skel) {alias}_monitor_bpf__destroy({alias}_skel);")
 
+# [추가] Cgroup 스캐너 스레드 초기화/종료 코드 생성
+    cgroup_scanner_init_code = ""
+    cgroup_scanner_join_code = ""
+    if aliases: # syscall 목록이 하나라도 있을 때만 스레드 생성
+        first_skel_name = aliases[0] + "_skel"
+        cgroup_scanner_init_code = textwrap.dedent(f"""
+    pthread_t tid;
+    g_map_fd = bpf_map__fd({first_skel_name}->maps.cgroup_map);
+    if (g_map_fd < 0) {{
+        fprintf(stderr, "Failed to get cgroup_map FD\\n");
+        goto cleanup;
+    }}
+    if (pthread_create(&tid, NULL, scanner_thread, NULL) != 0) {{
+        fprintf(stderr, "Failed to create scanner thread\\n");
+        goto cleanup;
+    }}""")
+        cgroup_scanner_join_code = "    pthread_join(tid, NULL);"
 
     rbs_initializers = []
     for i, name in enumerate(syscalls):
         # 'name'은 'close', 'lseek' 등이며, 이들이 'close_skel', 'lseek_skel'의 접두사가 됩니다.
         # rbs[i] = ring_buffer__new(bpf_map__fd(close_skel->maps.events), on_event, NULL, NULL);
-        line = f'    rbs[{i}] = ring_buffer__new(bpf_map__fd({alias}_skel->maps.events), on_event, NULL, NULL);'
+        line = f'    rbs[{i}] = ring_buffer__new(bpf_map__fd({name[0]}_skel->maps.events), on_event, NULL, NULL);'
         rbs_initializers.append(line)
 
     loader = LOADER_TEMPLATE.format(
@@ -190,6 +207,8 @@ def generate_loader(syscalls):
         num_syscalls=len(syscalls),
         event_cases='\n'.join(event_cases),
         enum_strings='\n'.join(enum_strings)
+        cgroup_scanner_init=cgroup_scanner_init_code,  # [추가]
+        cgroup_scanner_join=cgroup_scanner_join_code  # [추가]
     )
     with open(os.path.join(OUT_DIR, 'monitor_loader.c'), 'w') as f:
         f.write(loader)

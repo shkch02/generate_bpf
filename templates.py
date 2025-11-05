@@ -16,38 +16,26 @@ struct {{
     __uint(max_entries, 256 * 1024);
 }} events SEC(".maps");
 
-
+struct {{
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10240);
+    __type(key, __u64);
+    __type(value, __u8);
+}} cgroup_map SEC(".maps");
+    
 SEC("tracepoint/syscalls/sys_enter_{name}")
 int trace_{name}(struct trace_event_raw_sys_enter *ctx) {{
     char comm[16];
     bpf_get_current_comm(&comm, sizeof(comm));
 
-    // 컨테이너 런타임(runc, conmon, containerd-shim, docker)이 아니면 추적 중단
-    bool is_container = false;
+    /* [변경] 기존 comm 필터 로직을 Cgroup ID 필터로 교체 */
+    __u64 cgroup_id = bpf_get_current_cgroup_id();
+    __u8 *should_trace = bpf_map_lookup_elem(&cgroup_map, &cgroup_id);
 
-    // "runc"
-    if (comm[0]=='r' && comm[1]=='u' && comm[2]=='n' && comm[3]=='c')
-        is_container = true;
-
-    // "conmon"
-    if (comm[0]=='c' && comm[1]=='o' && comm[2]=='n' && comm[3]=='m'
-        && comm[4]=='o' && comm[5]=='n')
-        is_container = true;
-
-    // "containerd-shim"
-    if (comm[0]=='c' && comm[1]=='o' && comm[2]=='n' && comm[3]=='t'
-        && comm[4]=='a' && comm[5]=='i' && comm[6]=='n' && comm[7]=='e'
-        && comm[8]=='r' && comm[9]=='d' && comm[10]=='-' && comm[11]=='s'
-        && comm[12]=='h' && comm[13]=='i' && comm[14]=='m')
-        is_container = true;
-
-    // "docker"
-    if (comm[0]=='d' && comm[1]=='o' && comm[2]=='c'
-        && comm[3]=='k' && comm[4]=='e' && comm[5]=='r')
-        is_container = true;
-
-    if (!is_container)
+    // 맵에 없으면 (NULL) 즉시 종료 (필터링)
+    if (!should_trace) {{
         return 0;
+    }}
 
     /* 이하 eBPF 이벤트 생성 코드 계속… */
     struct event_t *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
@@ -96,7 +84,7 @@ monitor_loader: monitor_loader.c
 	-lbpf -lrdkafka -lpthread
 
 clean:
-	rm -f ./bpf/*.bpf.o ./bpf/*.skel.h monitor_loader
+	rm -f ./bpf/*.bpf.c ./bpf/*.bpf.o ./bpf/*.skel.h monitor_loader
 """)
 
 
@@ -111,6 +99,11 @@ LOADER_TEMPLATE = textwrap.dedent("""
 #include <unistd.h>
 #include <bpf/libbpf.h>
 #include <librdkafka/rdkafka.h>
+#include <pthread.h>      /* [추가] */
+#include <ftw.h>          /* [추가] */
+#include <errno.h>        /* [추가] */
+#include <sys/stat.h>     /* [추가] */
+#include <bpf/bpf.h>      /* [추가] BPF_ANY */
 #include "include/common_event_user.h"
 {includes} 
 // bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
@@ -118,6 +111,7 @@ LOADER_TEMPLATE = textwrap.dedent("""
 static volatile bool running = true;
 static rd_kafka_t *rk;
 static rd_kafka_topic_t *rkt;
+static int g_map_fd = -1;
 static const char *event_type_str[] = {{
 {enum_strings}
     }};
@@ -161,6 +155,43 @@ static void kafka_send(const char* buffer, size_t len) {{
     rd_kafka_poll(rk, 0);
                                   
     //printf("%s\\n", buffer);
+}}
+
+/* [추가] Cgroup 스캔 콜백 함수 (PoC 로직) */
+static int dir_scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {{
+    if (g_map_fd < 0) return -1; // 맵이 준비되지 않음
+
+    if (typeflag == FTW_D) {{
+        if (strstr(fpath, "kubepods") || strstr(fpath, "docker-")) {{
+            __u64 cgroup_id = sb->st_ino;
+            __u8 value = 1;
+
+            if (bpf_map_update_elem(g_map_fd, &cgroup_id, &value, BPF_ANY) != 0) {{
+                // fprintf(stderr, "Failed to update map for cgroup %s (ID: %llu): %s\\n", fpath, cgroup_id, strerror(errno));
+            }}
+        }}
+    }}
+    return 0; // 계속 스캔
+}}
+                                  
+/* [추가] Cgroup 스캐너 스레드 함수 (PoC 로직) */
+void *scanner_thread(void *arg) {{
+    if (g_map_fd < 0) {{
+        fprintf(stderr, "Scanner thread received invalid map FD\\n");
+        return NULL;
+    }}
+
+    /* [수정] 기존 'running' 전역 변수를 사용 */
+    while (running) {{ 
+        // printf("Scanning /sys/fs/cgroup...\\n");
+
+        if (nftw("/sys/fs/cgroup", dir_scan_callback, 20, FTW_PHYS) == -1) {{
+            fprintf(stderr, "Cgroup scan failed: %s\\n", strerror(errno));
+        }}
+
+        sleep(5); // 5초 대기
+    }}
+    return NULL;
 }}
 
 static void fprint_json_escaped_str(FILE *f, const char *s) {{
@@ -228,7 +259,10 @@ int main() {{
     {skeletons}
     struct ring_buffer *rbs[{num_syscalls}];
     {attaches}
-                                  
+
+    /* [추가] 스캐너 스레드 초기화 (code_generator.py에서 생성) */
+    {cgroup_scanner_init}
+
     {rbs_initializers}
 
     for (int i = 0; i < {num_syscalls}; i++) {{
@@ -255,6 +289,9 @@ int main() {{
     }}
 
 cleanup:
+    /* [추가] 스캐너 스레드 종료 대기 */
+    {cgroup_scanner_join}
+                                  
     for (int i = 0; i < {num_syscalls}; i++) {{
         ring_buffer__free(rbs[i]);
     }}
