@@ -44,7 +44,7 @@ def main():
     special_map, syscalls = analyze_syscalls_from_list(target_syscalls)
 
     if not syscalls:
-        print("\n[ERROR] Could not retrieve syscall list. Aborting. ")
+        print("\n[ERROR] Could not retrieve syscall list. Aborting.")
         return
 
     # 3. 생성할 타겟 목록 정리 (별칭과 기본 이름 분리)
