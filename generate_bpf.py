@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ubuntu 22.04 LTS에서 실행  
-
+import sys
 import json
 import argparse 
 
@@ -16,6 +16,18 @@ from code_generator import (
 )
 
 def main():
+
+    sys.stdout.write(r"       ____  _____  ______                                   _             ")
+    sys.stdout.write(r"      |  _ \|  __ \|  ____|                                 | |            ")
+    sys.stdout.write(r"   ___| |_) | |__) | |__      __ _  ___ _ __   ___ _ __ __ _| |_ ___  _ __ ")
+    sys.stdout.write(r"  / _ \  _ <|  ___/|  __|    / _` |/ _ \ '_ \ / _ \ '__/ _` | __/ _ \| '__|")
+    sys.stdout.write(r" |  __/ |_) | |    | |      | (_| |  __/ | | |  __/ | | (_| | || (_) | |   ")
+    sys.stdout.write(r"  \___|____/|_|    |_|       \__, |\___|_| |_|\___|_|  \__,_|\__\___/|_|   ")
+    sys.stdout.write(r"                              __/ |                                        ")
+    sys.stdout.write(r"                             |___/                                         ")
+    sys.stdout.write("\n")
+    sys.stdout.write(" [  eBPF generator running... ]\n")
+
     """ 스크립트 메인 실행 함수 """
     parser = argparse.ArgumentParser(description="Generate eBPF monitoring tools for specific syscalls from a JSON file.")
     parser.add_argument(
