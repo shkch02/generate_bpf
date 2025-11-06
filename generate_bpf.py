@@ -17,14 +17,14 @@ from code_generator import (
 
 def main():
 
-    sys.stdout.write(r"       ____  _____  ______                                   _             ")
-    sys.stdout.write(r"      |  _ \|  __ \|  ____|                                 | |            ")
-    sys.stdout.write(r"   ___| |_) | |__) | |__      __ _  ___ _ __   ___ _ __ __ _| |_ ___  _ __ ")
-    sys.stdout.write(r"  / _ \  _ <|  ___/|  __|    / _` |/ _ \ '_ \ / _ \ '__/ _` | __/ _ \| '__|")
-    sys.stdout.write(r" |  __/ |_) | |    | |      | (_| |  __/ | | |  __/ | | (_| | || (_) | |   ")
-    sys.stdout.write(r"  \___|____/|_|    |_|       \__, |\___|_| |_|\___|_|  \__,_|\__\___/|_|   ")
-    sys.stdout.write(r"                              __/ |                                        ")
-    sys.stdout.write(r"                             |___/                                         ")
+    sys.stdout.write(r"       ____  _____  ______                                   _             \n")
+    sys.stdout.write(r"      |  _ \|  __ \|  ____|                                 | |            \n")
+    sys.stdout.write(r"   ___| |_) | |__) | |__      __ _  ___ _ __   ___ _ __ __ _| |_ ___  _ __ \n")
+    sys.stdout.write(r"  / _ \  _ <|  ___/|  __|    / _` |/ _ \ '_ \ / _ \ '__/ _` | __/ _ \| '__|\n")
+    sys.stdout.write(r" |  __/ |_) | |    | |      | (_| |  __/ | | |  __/ | | (_| | || (_) | |   \n")
+    sys.stdout.write(r"  \___|____/|_|    |_|       \__, |\___|_| |_|\___|_|  \__,_|\__\___/|_|   \n")
+    sys.stdout.write(r"                              __/ |                                        \n")
+    sys.stdout.write(r"                             |___/                                         \n")
     sys.stdout.write("\n")
     sys.stdout.write(" [  eBPF generator running... ]\n")
 
