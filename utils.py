@@ -4,7 +4,8 @@
 import os
 import re
 import subprocess
-from config import MANUAL_MAP
+from functools import lru_cache 
+from config import MANUAL_MAP, MANUAL_ALIAS_MAP
 
 # --- man 페이지 분석해서 시스템 콜별 인자 이름 추출 ---
 def get_proto(syscall):
@@ -145,8 +146,24 @@ def parse_man():
         return []
         
     print(f"Successfully parsed {len(syscall_names)} filtered syscalls from man page.")
-    
-    return [(name, name) for name in sorted(list(syscall_names))]
+
+    # 기존: return [(name, name) for name in sorted(list(syscall_names))]
+    return sorted(list(syscall_names)) # 변경: 튜플이 아닌 문자열 리스트 반환
+
+# [★★ 여기에 추가 ★★]
+# 2. 파싱된 'man 2 syscalls' 목록을 전역 세트(Set)로 캐싱
+#    프로그램 시작 시 한 번만 실행됩니다.
+#
+print("Populating master syscall list...")
+# parse_man()이 이름 리스트를 반환하도록 수정했으므로 set으로 바로 변환
+VALID_SYSCALLS = set(parse_man())
+if not VALID_SYSCALLS:
+    print("[FATAL ERROR] Master syscall list (VALID_SYSCALLS) is empty. Alias filtering will fail.")
+    # 실제 환경에서는 여기서 프로그램을 종료하거나
+    # VALID_SYSCALLS가 비어있을 때의 예외 처리를 get_aliases에 추가해야 합니다.
+else:
+    print(f"Master list populated with {len(VALID_SYSCALLS)} syscalls.")
+print("-" * 30)
 
 
 # --- REFACTOR: 중복 로직을 헬퍼 함수로 추출 ---
@@ -212,24 +229,77 @@ def analyze_syscalls_from_list(target_syscalls):
     return special_map, final_syscalls
 
 
-# --- [★★ 신규 추가 ★★] (테스트용 스텁 함수) ---
+@lru_cache(maxsize=None)
 def get_aliases(target_syscall):
     """
-    [TEST STUB]
-    주어진 syscall의 별칭 목록을 반환합니다.
-    TODO: 향후 man 2 파싱 로직으로 대체되어야 합니다.
+    주어진 syscall의 man 2 페이지와 수동 맵을 기반으로
+    관련된 모든 *시스템 콜* 목록을 반환합니다.
     """
-    print(f"[Dev Stub] get_aliases({target_syscall}) called...")
+    print(f"[Info] get_aliases('{target_syscall}') called...")
     
-    # 테스트용 매핑 (필요에 따라 확장하세요)
-    alias_map = {
-        'open': ['open', 'openat', 'openat2'],
-        'lseek': ['lseek'],
-        'close': ['close'],
-        # 'read': ['read', 'pread64', 'readv'],
-    }
+    if not VALID_SYSCALLS:
+         print(f"  -> [Error] VALID_SYSCALLS list is empty.")
+         return [target_syscall]
+
+    candidates = set()
+
+    # 1. 수동 맵에서 먼저 찾기 (가장 정확함)
+    if target_syscall in MANUAL_ALIAS_MAP:
+        print("  -> Found in MANUAL_ALIAS_MAP.")
+        candidates.update(MANUAL_ALIAS_MAP[target_syscall])
     
-    # 매핑에 없으면 자기 자신만 반환
-    found = alias_map.get(target_syscall, [target_syscall])
-    print(f"           -> returning: {found}")
-    return found
+    # 2. man 페이지 파싱 (수동 맵에 없는 경우)
+    if not candidates:
+        print("  -> Not in manual map, parsing man page...")
+        
+        text = ""
+        
+        try:
+            env = os.environ.copy()
+            env['LC_ALL'] = 'C'
+            text = subprocess.check_output(
+                ['man', '2', target_syscall], 
+                text=True, stderr=subprocess.PIPE, env=env
+            )
+        except Exception: # FileNotFoundError, CalledProcessError
+            print(f"  -> [Warning] 'man 2 {target_syscall}' page not found or failed.")
+            # man 페이지가 없어도 target이 유효하면 반환
+            if target_syscall in VALID_SYSCALLS:
+                candidates.add(target_syscall)
+            # else: 이 syscall은 존재하지 않음 (Test 6)
+        
+        # man 파싱 로직 (이전과 동일)
+        in_name_section = False
+        parsed_names = []
+        for line in text.splitlines():
+            if line.strip() == "NAME":
+                in_name_section = True
+                continue
+            if in_name_section and line.strip():
+                name_list_str = line.split(' - ', 1)[0]
+                raw_names = name_list_str.split(',')
+                parsed_names = [name.strip() for name in raw_names if name.strip()]
+                break # NAME 섹션 첫 줄만 파싱
+        
+        if not parsed_names:
+            candidates.add(target_syscall) # 파싱 실패 시 자기 자신만 추가
+        else:
+            candidates.update(parsed_names)
+
+    # 3. 최종 필터링: VALID_SYSCALLS에 존재하는 것만 반환
+    aliases = []
+    for name in candidates:
+        if name in VALID_SYSCALLS:
+            aliases.append(name)
+        else:
+            print(f"  -> [Debug] Filtered out '{name}' (not in VALID_SYSCALLS).")
+
+    if not aliases and target_syscall in VALID_SYSCALLS:
+         print(f"  -> [Warning] No aliases found, returning self.")
+         aliases = [target_syscall]
+         
+    final_list = sorted(list(set(aliases)))
+    print(f"  -> returning: {final_list}")
+    return final_list
+
+# (utils.py 파일 끝)
