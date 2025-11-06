@@ -6,7 +6,7 @@ import argparse
 
 # --- 다른 모듈에서 필요한 함수들을 가져옵니다 ---
 #man 2 syscall 파싱 함수로 대체필요함
-from utils import analyze_syscalls_from_list
+from utils import analyze_syscalls_from_list,get_aliases
 from code_generator import (
     generate_common_event_bpf,
     generate_common_event_user,
@@ -38,10 +38,42 @@ def main():
     except (json.JSONDecodeError, ValueError) as e:
         print(f"\n[ERROR] Invalid or malformed JSON file: {e}")
         return
-
-    # 2. TODO : open - openat 등으로 매핑을
+        
+    # (will be 2.)  [수정] 타겟 목록 확장 (get_aliases 호출)
+    print("Expanding syscall targets with aliases...")
+    all_target_aliases = set()
+    for syscall_name in target_syscalls:
+        # get_aliases('open')가 ['open', 'openat', 'openat2'] 등을 
+        # 반환한다고 가정합니다.
+        try:
+            aliases_found = get_aliases(syscall_name) # 가정의 함수 호출
+            all_target_aliases.update(aliases_found)
+        except Exception as e:
+            print(f"[WARN] Could not get aliases for '{syscall_name}': {e}")
+            # 원본 syscall 이름이라도 추가
+            all_target_aliases.add(syscall_name) 
+    # 중복 제거된 전체 별칭 목록
+    final_target_list = sorted(list(all_target_aliases))
+    if not final_target_list:
+        print("\n[ERROR] No valid syscall targets found after expansion.")
+        return
+            
+    # (will be 3.) [수정] 확장된 전체 목록으로 시스템 콜 분석
+    # ★★★ 여기가 핵심입니다 ★★★
+    # analyze_syscalls_from_list가 (alias, base) 튜플을 반환합니다.
+    # 이 함수를 수정해서 (alias, alias)를 반환하도록 해야 합니다.
     print("Analyzing syscalls and parsing man pages...")
-    special_map, syscalls = analyze_syscalls_from_list(target_syscalls)
+    special_map, syscalls = analyze_syscalls_from_list(final_target_list)
+    # 'syscalls'는 이제 [('open', 'open'), ('openat', 'openat'), ...]
+    # 형태가 되어야 합니다.
+
+    # 중복 제거된 전체 별칭 목록
+    final_target_list = sorted(list(all_target_aliases))
+    if not final_target_list:
+        print("\n[ERROR] No valid syscall targets found after expansion.")
+        return
+
+    print(f"Final target list: {final_target_list}")
 
     if not syscalls:
         print("\n[ERROR] Could not retrieve syscall list. Aborting.")
@@ -50,6 +82,12 @@ def main():
     # 3. 생성할 타겟 목록 정리 (별칭과 기본 이름 분리)
     aliases = sorted([alias for alias, _ in syscalls])
     bases = sorted(list(set(base for _, base in syscalls)))
+  
+    print("\n" + "="*20 + " [ 변수 확인 ] " + "="*20)
+    print(f"✅ ALIASES (별칭 목록):\n{aliases}\n")
+    print(f"✅ BASES (기본 함수명 목록):\n{bases}\n")
+    print(f"✅ SYSCALLS (전체 매핑 목록):\n{syscalls}")
+    print("="*54 + "\n")
 
     # 4. 각 코드/파일 생성 함수 순차 호출 (code_generator.py에 위임)
     print("\nGenerating BPF common header...")

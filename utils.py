@@ -155,84 +155,81 @@ def get_syscall_info(syscall_name):
     types, arg_names = get_proto(syscall_name)
     return types, arg_names
 
-# --- REFACTORED & COMBINED: 두 함수의 장점을 결합한 최종 분석 함수 ---
+# --- [★★ 핵심 수정 ★★] REFACTORED: 1:1 매핑을 수행하도록 로직 변경 ---
 def analyze_syscalls_from_list(target_syscalls):
     """
-    사용자가 제공한 시스템 콜 목록을 기반으로 커널 심볼을 찾고,
-    매핑 정보를 생성하며, 찾지 못한 심볼은 사용자에게 알려줍니다.
+    [REFACTORED]
+    사용자가 제공한 (확장된) 시스템 콜 별칭 목록을 기반으로,
+    각 별칭의 man 페이지 존재 여부를 검증하고 (alias, alias) 튜플 리스트를 반환합니다.
+    N:1 (alias -> base) 매핑 로직을 제거하고 1:1 매핑을 수행합니다.
     """
-    # 1) /proc/kallsyms 에서 커널 심볼을 한 번만 읽어 Set으로 만듭니다.
-    print("Reading kernel symbols from /proc/kallsyms...")
-    try:
-        with open("/proc/kallsyms") as f:
-            kernel_syms = {
-                re.sub(r"^__x64_sys_", "", line.split()[-1])
-                for line in f
-                if "__x64_sys_" in line
-            }
-    except FileNotFoundError:
-        print("[ERROR] /proc/kallsyms not found. Are you running on Linux?")
-        return {}, []
-
-    # --- 분석 결과를 저장할 변수들 ---
-    user_space_syscalls = sorted(list(set(target_syscalls))) # 입력 목록 (중복제거, 정렬)
-    final_syscalls = []      # 최종 처리될 (alias, base) 튜플 리스트
-    final_special_map = {}   # 최종 special_map
+    # generate_bpf.py의 get_aliases()가 확장된 리스트를 제공했다고 가정합니다.
+    syscall_aliases = sorted(list(set(target_syscalls)))
     
-    # --- 매칭되지 않은 심볼을 찾기 위한 과정 ---
-    # 2) 커널 심볼과 일치하지 않는 사용자 공간 심볼 목록(missing)을 찾습니다.
-    missing = [name for name in user_space_syscalls if name not in kernel_syms]
+    print(f"Analyzing {len(syscall_aliases)} syscall aliases (1:1 mapping)...")
 
-    # 3) 자동 후보 추론 (auto_map 생성)
-    auto_map = {}
-    for name in missing:
-        # MANUAL_MAP에 이미 정의된 경우는 건너뜁니다.
-        if name in MANUAL_MAP:
-            continue
-            
-        cand = name.lstrip('_')
-        for suffix in ('time32', 'time64', '32', '64'):
-            if cand.endswith(suffix):
-                cand = cand[:-len(suffix)]
+    final_syscalls = []      # 최종 처리될 (alias, alias) 튜플 리스트
+    special_map = {}       # 맵은 비어있지만, 호환성을 위해 반환
+    skipped_syscalls = []
+
+    # 1:1 매핑을 위해 kallsyms, MANUAL_MAP 로직을 모두 제거합니다.
+
+    for alias in syscall_aliases:
+        # 1. get_proto를 호출하여 인자 파싱을 시도합니다.
+        #    (get_proto는 'void' 인자나 파싱 실패 시 [], []를 반환할 수 있습니다)
+        get_proto(alias)
         
-        if cand in kernel_syms:
-            auto_map[name] = cand
+        # 2. man 페이지가 실제로 존재하는지 '확인'합니다.
+        #    get_proto가 파싱에 실패해도(e.g., void), man 페이지만 있으면 유효한 syscall로 간주합니다.
+        check_cmd = ['man', '2', alias]
+        env = os.environ.copy()
+        env['LC_ALL'] = 'C'
+        
+        try:
+            # man 페이지만 있는지 확인
+            subprocess.check_output(check_cmd, text=True, stderr=subprocess.PIPE, env=env)
+            
+            # man 페이지가 존재하므로 유효한 syscall로 처리
+            print(f"  -> Successfully validated: {alias}")
+            final_syscalls.append((alias, alias))
 
-    # 4) 최종 special_map을 생성합니다. (수동 + 자동)
-    final_special_map = MANUAL_MAP.copy()
-    final_special_map.update(auto_map)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # man 페이지 자체가 없음
+            print(f"  [WARN] 'man 2 {alias}' not found. Skipping.")
+            skipped_syscalls.append(alias)
 
-    # 5) 최종적으로 처리할 시스템 콜 목록(final_syscalls)을 만듭니다.
-    for name in user_space_syscalls:
-        # 커널에 심볼이 그대로 있는 경우
-        if name in kernel_syms:
-            final_syscalls.append((name, name))
-        # special_map (수동 또는 자동)에 매핑 정보가 있는 경우
-        elif name in final_special_map:
-            final_syscalls.append((name, final_special_map[name]))
-        # 매칭되는 심볼이 전혀 없는 경우 (이 경우는 건너뜀)
-        else:
-            continue
-
-    # 6) 사용자에게 매핑 결과와 수동 매핑이 필요한 목록을 출력합니다.
-    remaining = [n for n in missing if n not in final_special_map]
-
-    if remaining:
-        print("\n=== SPECIAL_MAP에 수동 매핑이 필요한 이름들 ===")
-        print("# 아래 시스템 콜은 커널 심볼을 찾지 못했습니다. config.py의 MANUAL_MAP에 추가해야 할 수 있습니다.")
-        for name in remaining:
-            print(f"    '{name}': '???',")
-        print("==============================================\n")
-
-    if auto_map:
-        print("=== 자동으로 채워진 SPECIAL_MAP 항목들 ===")
-        for k, v in auto_map.items():
-            print(f"    '{k}': '{v}',")
-        print("=========================================\n")
+    if skipped_syscalls:
+        print("\n=== 건너뛴 시스템 콜 목록 (man 2 페이지 없음) ===")
+        print(f"# {skipped_syscalls}")
+        print("================================================\n")
     
     if not final_syscalls:
         print("\n[ERROR] No valid syscalls could be processed from the input list. Aborting.")
         return {}, []
 
-    print(f"Successfully processed {len(final_syscalls)} syscalls.")
-    return final_special_map, final_syscalls
+    print(f"Successfully processed {len(final_syscalls)} syscalls for 1:1 mapping.")
+    # special_map은 비어있지만, generate_bpf.py의 API 호환성을 위해 반환
+    return special_map, final_syscalls
+
+
+# --- [★★ 신규 추가 ★★] (테스트용 스텁 함수) ---
+def get_aliases(target_syscall):
+    """
+    [TEST STUB]
+    주어진 syscall의 별칭 목록을 반환합니다.
+    TODO: 향후 man 2 파싱 로직으로 대체되어야 합니다.
+    """
+    print(f"[Dev Stub] get_aliases({target_syscall}) called...")
+    
+    # 테스트용 매핑 (필요에 따라 확장하세요)
+    alias_map = {
+        'open': ['open', 'openat', 'openat2'],
+        'lseek': ['lseek'],
+        'close': ['close'],
+        # 'read': ['read', 'pread64', 'readv'],
+    }
+    
+    # 매핑에 없으면 자기 자신만 반환
+    found = alias_map.get(target_syscall, [target_syscall])
+    print(f"           -> returning: {found}")
+    return found
