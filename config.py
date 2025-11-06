@@ -33,9 +33,10 @@ MANUAL_ALIAS_MAP = {
     # value: 함께 추적해야 할 syscalls (주로 실제 kernel syscall)
 
         # open(2) 계열 -> sys_openat, man 2 open에 openat2가 없어서 여기서 수동으로 조정
-    'open': ['open', 'openat', 'creat'],
-    'openat': ['open', 'openat', 'creat'],
-    'creat': ['open', 'openat', 'creat'],
+    'open': ['open', 'openat', 'creat', 'openat2'],
+    'openat': ['open', 'openat', 'creat', 'openat2'],
+    'creat': ['open', 'openat', 'creat', 'openat2'],
+    'openat2': ['open', 'openat', 'creat', 'openat2'], # openat2도 추가
     
     # select(2) 계열 -> sys_pselect6
     # VALID_SYSCALLS에 'pselect6'가 있다고 가정합니다. 
