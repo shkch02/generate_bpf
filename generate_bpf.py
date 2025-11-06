@@ -3,6 +3,19 @@
 import json
 import argparse 
 
+print(r"""
+           ____  _____  ______                                   _             
+          |  _ \|  __ \|  ____|                                 | |            
+       ___| |_) | |__) | |__      __ _  ___ _ __   ___ _ __ __ _| |_ ___  _ __ 
+      / _ \  _ <|  ___/|  __|    / _` |/ _ \ '_ \ / _ \ '__/ _` | __/ _ \| '__|
+     |  __/ |_) | |    | |      | (_| |  __/ | | |  __/ | | (_| | || (_) | |   
+      \___|____/|_|    |_|       \__, |\___|_| |_|\___|_|  \__,_|\__\___/|_|   
+                                  __/ |                                        
+                                 |___/                                         
+          """)
+    
+print(" [  eBPF generator running... ]\n")
+
 # --- 다른 모듈에서 필요한 함수들을 가져옵니다 ---
 #man 2 syscall 파싱 함수로 대체필요함
 from utils import analyze_syscalls_from_list,get_aliases
@@ -16,18 +29,6 @@ from code_generator import (
 
 def main():
 
-    print(r"""
-           ____  _____  ______                                   _             
-          |  _ \|  __ \|  ____|                                 | |            
-       ___| |_) | |__) | |__      __ _  ___ _ __   ___ _ __ __ _| |_ ___  _ __ 
-      / _ \  _ <|  ___/|  __|    / _` |/ _ \ '_ \ / _ \ '__/ _` | __/ _ \| '__|
-     |  __/ |_) | |    | |      | (_| |  __/ | | |  __/ | | (_| | || (_) | |   
-      \___|____/|_|    |_|       \__, |\___|_| |_|\___|_|  \__,_|\__\___/|_|   
-                                  __/ |                                        
-                                 |___/                                         
-          """)
-    
-    print(" [  eBPF generator running... ]\n")
 
     """ 스크립트 메인 실행 함수 """
     parser = argparse.ArgumentParser(description="Generate eBPF monitoring tools for specific syscalls from a JSON file.")
