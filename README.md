@@ -89,3 +89,6 @@ sudo ./monitor_loader
 ## ToDo
 
 #### 룰 엔진에서 buf 인식 제대로 못하는데 어차피 쓸모없는 가상주소인데 걍 버릴까
+
+
+#### get_aliases, parse_man 같이 메뉴얼에 의존하지말고 glibc 가서 open.c 파싱해보면 실호출하는거 나올거고, 그 실호출함수인 openat.c 가서 인자 뽑으면 되잖아 
