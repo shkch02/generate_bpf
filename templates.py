@@ -84,12 +84,9 @@ monitor_loader: monitor_loader.c
 	-lbpf -lrdkafka -lpthread
 
 clean:
-	rm -f ./bpf/*.bpf.c ./bpf/*.bpf.o ./bpf/*.skel.h monitor_loader
+	rm -f ./bpf/*.bpf.c ./bpf/*.bpf.o ./bpf/*.skel.h monitor_loader monitor_loader.c
 """)
 
-
-# IMPROVEMENT: Kafka 관련 로직 개선 및 에러 처리 추가
-#bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 LOADER_TEMPLATE = textwrap.dedent("""
 /* [추가] open_memstream을 위해 _GNU_SOURCE를 최상단에 추가 */
 #define _GNU_SOURCE
@@ -102,7 +99,7 @@ LOADER_TEMPLATE = textwrap.dedent("""
 #include <signal.h>
 #include <unistd.h>
 #include <bpf/libbpf.h>
-#include <librdkafka/rdkafka.h>
+//#include <librdkafka/rdkafka.h>       //***********KAFKA*************
 #include <pthread.h>      /* [추가] */
 #include <ftw.h>          /* [추가] */
 #include <errno.h>        /* [추가] */
@@ -113,8 +110,8 @@ LOADER_TEMPLATE = textwrap.dedent("""
 // bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 
 static volatile bool running = true;
-static rd_kafka_t *rk;
-static rd_kafka_topic_t *rkt;
+//static rd_kafka_t *rk;            //***********KAFKA*************
+//static rd_kafka_topic_t *rkt;     //***********KAFKA*************
 static int g_map_fds[{num_syscalls}] = {{{num_0f_minus1s}}}; 
 static const char *event_type_str[] = {{
 {enum_strings}
@@ -125,6 +122,9 @@ void sig_handler(int sig) {{
     running = false;
 }}
 
+
+//***********KAFKA*************                                  
+/*
 // IMPROVEMENT: Kafka delivery report callback
 static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
     if (rkmessage->err) {{
@@ -159,7 +159,17 @@ static void kafka_send(const char* buffer, size_t len) {{
     rd_kafka_poll(rk, 0);
                                   
     //printf("%s\\n", buffer);
+}}*/
+                                  
+
+//***********KAFKA************* when kafka is adapted, delete this function
+static void stdout_send(const char* buffer, size_t len) {{
+    if (!buffer || len == 0) return;
+    printf("%s\\n", buffer);
 }}
+                                  
+
+
 
 /* [추가] Cgroup 스캔 콜백 함수 (PoC 로직) */
 static int dir_scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {{
@@ -191,7 +201,7 @@ void *scanner_thread(void *arg) {{
         return NULL;
     }}
 
-    /* [수정] 기존 'running' 전역 변수를 사용 */
+    /* [수정] 기존 'running' 전역 변수를 사용  */
     while (running) {{ 
         // printf("Scanning /sys/fs/cgroup...\\n");
 
@@ -251,7 +261,9 @@ static void serialize_and_send(const struct event_t *e) {{
     fprintf(f, "}}");
     fclose(f);
 
-    kafka_send(buf, size);
+    //***********KAFKA*************
+    //kafka_send(buf, size);
+    stdout_send(buf, size);
     free(buf);
 }}
 
@@ -264,7 +276,8 @@ int main() {{
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
 
-    kafka_init();
+//***********KAFKA*************
+//   kafka_init();
 
     {skeletons}
     struct ring_buffer *rbs[{num_syscalls}];
@@ -307,9 +320,10 @@ cleanup:
     }}
     {destroys}
     fprintf(stderr, "\\nFlushing final Kafka messages...\\n");
-    rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
-    rd_kafka_topic_destroy(rkt);
-    rd_kafka_destroy(rk);
+   //***********KAFKA*************
+    //rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
+    //rd_kafka_topic_destroy(rkt);
+    //rd_kafka_destroy(rk);
     printf("Cleaned up resources.\\n");
     return 0;
 }}
