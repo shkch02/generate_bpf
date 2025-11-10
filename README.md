@@ -96,3 +96,7 @@ sudo ./monitor_loader
 
 #### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls 에 있긴한데..
  권한 문제가 있음
+
+# 8. 문제있는 시스템콜
+
+https://www.notion.so/syscall-2a7434ea679f8018aab3d706b87084ce?source=copy_link
