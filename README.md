@@ -97,6 +97,9 @@ sudo ./monitor_loader
 #### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls을 참고해야함 없는 진입점 코드 생성하는 문제있음
  권한 문제가 있음
 
+#### buf 인자 따옴표로 감싸야함(16진수라)
+근데 주소값 없앨거같긴한데 일단은... 자료형은 맞춰놓고 나중에 생각
+
 # 8. 문제있는 시스템콜
 
 https://www.notion.so/syscall-2a7434ea679f8018aab3d706b87084ce?source=copy_link
