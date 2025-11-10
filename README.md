@@ -94,7 +94,7 @@ sudo ./monitor_loader
 #### get_aliases, parse_man 같이 메뉴얼에 의존하지말고 glibc 가서 open.c 파싱해보면 실호출하는거 나올거고, 그 실호출함수인 openat.c 가서 인자 뽑으면 되잖아 
 
 
-#### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls 에 있긴한데..
+#### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls을 참고해야함 없는 진입점 코드 생성하는 문제있음
  권한 문제가 있음
 
 # 8. 문제있는 시스템콜
