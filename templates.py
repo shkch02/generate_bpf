@@ -163,7 +163,7 @@ static void kafka_send(const char* buffer, size_t len) {{
                                   
 
 //***********KAFKA************* when kafka is adapted, delete this function
-static void stdout_send(const char* buffer, size_t len) {{}
+static void stdout_send(const char* buffer, size_t len) {{
     if (!buffer || len == 0) return;
     printf("%s\\n", buffer);
 }}
