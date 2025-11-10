@@ -110,8 +110,8 @@ LOADER_TEMPLATE = textwrap.dedent("""
 // bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 
 static volatile bool running = true;
-static rd_kafka_t *rk;
-static rd_kafka_topic_t *rkt;
+//static rd_kafka_t *rk;            //***********KAFKA*************
+//static rd_kafka_topic_t *rkt;     //***********KAFKA*************
 static int g_map_fds[{num_syscalls}] = {{{num_0f_minus1s}}}; 
 static const char *event_type_str[] = {{
 {enum_strings}
