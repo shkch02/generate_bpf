@@ -201,7 +201,7 @@ void *scanner_thread(void *arg) {{
         return NULL;
     }}
 
-    /* [수정] 기존 'running' 전역 변수를 사용 */
+    /* [수정] 기존 'running' 전역 변수를 사용  */
     while (running) {{ 
         // printf("Scanning /sys/fs/cgroup...\\n");
 
