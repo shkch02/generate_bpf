@@ -95,10 +95,11 @@ sudo ./monitor_loader
 
 man 2 파싱 의존성 아예 없어져야함, 최소한의 자료형 처리 로직은 남겨야할수도(eBPF 생성 로직을 위해)
 
-#### get_aliases, parse_man 같이 메뉴얼에 의존하지말고 glibc 가서 open.c 파싱해보면 실호출하는거 나올거고, 그 실호출함수인 openat.c 가서 인자 뽑으면 되잖아 -> glibc parser로 업무 이관
+
+#### get_aliases, parse_man 같이 메뉴얼에 의존하지말고 glibc 가서 open.c 파싱해보면 실호출하는거 나올거고, 그 실호출함수인 openat.c 가서 인자 뽑으면 되잖아 -> glibc parser로 업무 이관하기위해 파싱관련 의존성 제거 필요
 
 
-#### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls을 참고해야함 없는 진입점 코드 생성하는 문제있음 마찬가지로 업무 이관
+#### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls을 참고해야함 없는 진입점 코드 생성하는 문제있음 마찬가지로 업무 이관, 여기서 고민할 내용 아님
 
 #### (완료) buf 인자 따옴표로 감싸야함(16진수라)
 주소값 내용 따오려면 엄청난 리팩토링 필요 better die
