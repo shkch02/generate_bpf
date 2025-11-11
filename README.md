@@ -88,18 +88,17 @@ sudo ./monitor_loader
 
 ## ToDo
 
-#### 룰 엔진에서 buf 인식 제대로 못하는데 어차피 쓸모없는 가상주소인데 걍 버릴까
+#### 룰 엔진에서 buf 인식 제대로 못하는데 어차피 쓸모없는 가상주소인데 걍 버릴까 -> 일단 가지고는 있자 why? 추후 필요한 인자들은 버퍼 읽어올수도 있지만 일단 주소값으로 두고 넘어가
 
 
-#### get_aliases, parse_man 같이 메뉴얼에 의존하지말고 glibc 가서 open.c 파싱해보면 실호출하는거 나올거고, 그 실호출함수인 openat.c 가서 인자 뽑으면 되잖아 
+### 커널 syscall 이름과 인자는 외부(웹서버와 yaml)에서 받아오고 여기서는 json토대로 eBPF코드 생성만 담당
+
+man 2 파싱 의존성 아예 없어져야함, 최소한의 자료형 처리 로직은 남겨야할수도(eBPF 생성 로직을 위해)
+
+#### get_aliases, parse_man 같이 메뉴얼에 의존하지말고 glibc 가서 open.c 파싱해보면 실호출하는거 나올거고, 그 실호출함수인 openat.c 가서 인자 뽑으면 되잖아 -> glibc parser로 업무 이관
 
 
-#### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls을 참고해야함 없는 진입점 코드 생성하는 문제있음
- 권한 문제가 있음
+#### proc/kallsyms 도 바꿔 kprobe 안쓰니까. 대신 tracepoint용 진입점 이름은 /sys/kernel/debug/tracing/events/syscalls을 참고해야함 없는 진입점 코드 생성하는 문제있음 마찬가지로 업무 이관
 
-#### buf 인자 따옴표로 감싸야함(16진수라)
-근데 주소값 없앨거같긴한데 일단은... 자료형은 맞춰놓고 나중에 생각
-
-# 8. 문제있는 시스템콜
-
-https://www.notion.so/syscall-2a7434ea679f8018aab3d706b87084ce?source=copy_link
+#### (완료) buf 인자 따옴표로 감싸야함(16진수라)
+주소값 내용 따오려면 엄청난 리팩토링 필요 better die
