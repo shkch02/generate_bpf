@@ -67,7 +67,7 @@ def make_bindings(name, types, arg_names):
     return "\n".join(lines)
 
 # --- .bpf.c 파일 생성 ---
-def generate_bpf_sources(bases,special_map):
+def generate_bpf_sources(bases):
     """ CSV와 템플릿을 기반으로 다수의 .bpf.c 파일을 생성 """
     os.makedirs(BPF_DIR, exist_ok=True) #BPF_DIR = ./bpf
     for base in bases:
