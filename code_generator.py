@@ -94,12 +94,9 @@ def generate_makefile(targets):
     # --- 로더 C 코드 생성 ---
 
 # --- _loader.c 생성 ---
-def generate_loader(syscalls):
+def generate_loader(bases):
     """ 로더 C 코드(monitor_loader.c)를 생성 """
     includes, skeletons, attaches, destroys, event_cases,enum_strings = [], [], [], [], [],[]
-    
-    aliases = sorted([alias for alias, _ in syscalls])
-    bases = sorted(list(set(base for _, base in syscalls)))
 
     # Generate serialization cases for each unique base syscall aaa
     for base in bases:
@@ -107,9 +104,7 @@ def generate_loader(syscalls):
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
         case_str = f"        case EVT_{base.upper()}:\n"
         
-        # Find a representative alias to get the function signature
-        rep_alias = next(alias for alias, b in syscalls if b == base)
-        types, arg_names = get_syscall_info(rep_alias)
+        types, arg_names = get_syscall_info(bases)
 
         ##typ 변수형 리스트를 받아서, 각 typ의 변수형을 반환하는 함수 필요할거 같음 지금 if else로는 제대로 필터링하지 못함 
 
@@ -158,7 +153,7 @@ def generate_loader(syscalls):
         event_cases.append(case_str)
 
     # Generate includes, skeletons, etc. for each alias
-    for alias in aliases:
+    for bases in bases:
         includes.append(f'#include "bpf/{alias}_monitor.skel.h"')
         skeletons.append(f"    struct {alias}_monitor_bpf *{alias}_skel = NULL;")
         attaches.append(textwrap.dedent(f"""
@@ -176,7 +171,7 @@ def generate_loader(syscalls):
 # [추가] Cgroup 스캐너 스레드 초기화/종료 코드 생성
     cgroup_scanner_init_code = ""
     cgroup_scanner_join_code = ""
-    if aliases: # syscall 목록이 하나라도 있을 때만 스레드 생성
+    if bases: # syscall 목록이 하나라도 있을 때만 스레드 생성
         
         # C 코드를 담을 리스트
         init_lines = [
@@ -188,15 +183,15 @@ def generate_loader(syscalls):
         # 예: g_map_fds[0] = bpf_map__fd(close_skel->maps.cgroup_map);
         #     g_map_fds[1] = bpf_map__fd(lseek_skel->maps.cgroup_map);
         #     ...
-        for i, alias in enumerate(aliases):
+        for i, alias in enumerate(bases):
             skel_name = f"{alias}_skel"
             init_lines.append(f"    g_map_fds[{i}] = bpf_map__fd({skel_name}->maps.cgroup_map);")
 
         # [수정] 
         # 5개 맵 FD가 모두 유효한지 확인하는 C 코드 추가
         init_lines.append(textwrap.dedent(f"""
-    /* [추가] {len(aliases)}개 맵 FD가 모두 유효한지 확인 */
-    for (int i = 0; i < {len(aliases)}; i++) {{
+    /* [추가] {len(bases)}개 맵 FD가 모두 유효한지 확인 */
+    for (int i = 0; i < {len(bases)}; i++) {{
         if (g_map_fds[i] < 0) {{
             fprintf(stderr, "Failed to get cgroup_map FD for skeleton index %d\\n", i);
             goto cleanup;
@@ -218,7 +213,7 @@ def generate_loader(syscalls):
         cgroup_scanner_join_code = "    pthread_join(tid, NULL);"
 
     rbs_initializers = []
-    for i, name in enumerate(syscalls):
+    for i, name in enumerate(bases):
         # 'name'은 'close', 'lseek' 등이며, 이들이 'close_skel', 'lseek_skel'의 접두사가 됩니다.
         # rbs[i] = ring_buffer__new(bpf_map__fd(close_skel->maps.events), on_event, NULL, NULL);
         line = f'rbs[{i}] = ring_buffer__new(bpf_map__fd({name[0]}_skel->maps.events), on_event, NULL, NULL);'
@@ -230,12 +225,12 @@ def generate_loader(syscalls):
         attaches='\n'.join(attaches),
         destroys='\n'.join(destroys),
         rbs_initializers='\n'.join(rbs_initializers),
-        num_syscalls=len(syscalls),
+        num_syscalls=len(bases),
         event_cases='\n'.join(event_cases),
         enum_strings='\n'.join(enum_strings),
         cgroup_scanner_init=cgroup_scanner_init_code,  # [추가]
         cgroup_scanner_join=cgroup_scanner_join_code,  # [추가]
-        num_0f_minus1s=','.join(['-1'] * len(syscalls))  # [추가]
+        num_0f_minus1s=','.join(['-1'] * len(bases))  # [추가]
     )
     with open(os.path.join(OUT_DIR, 'monitor_loader.c'), 'w') as f:
         f.write(loader)
