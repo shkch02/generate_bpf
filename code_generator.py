@@ -213,10 +213,10 @@ def generate_loader(bases):
         cgroup_scanner_join_code = "    pthread_join(tid, NULL);"
 
     rbs_initializers = []
-    for i, name in enumerate(bases):
+    for i,name in enumerate(bases):
         # 'name'은 'close', 'lseek' 등이며, 이들이 'close_skel', 'lseek_skel'의 접두사가 됩니다.
         # rbs[i] = ring_buffer__new(bpf_map__fd(close_skel->maps.events), on_event, NULL, NULL);
-        line = f'rbs[{i}] = ring_buffer__new(bpf_map__fd({name[0]}_skel->maps.events), on_event, NULL, NULL);'
+        line = f'rbs[{i}] = ring_buffer__new(bpf_map__fd({name}_skel->maps.events), on_event, NULL, NULL);'
         rbs_initializers.append(line)
 
     loader = LOADER_TEMPLATE.format(
