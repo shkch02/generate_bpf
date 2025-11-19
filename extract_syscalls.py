@@ -1,46 +1,41 @@
 import re
-import sys
+import json
+import argparse 
 
-def extract_and_filter_syscall_names(file_content):
-    syscalls = []
-    in_syscall_list = False
-    # Keywords to identify architecture-specific syscalls
-    arch_keywords = [
-        "x86", "sparc", "ARM", "Alpha", "PowerPC", "s390", "m68k", "IA-64",
-        "Xtensa", "ARC", "RISC-V", "OpenRISC", "Blackfin", "Metag", "Tile",
-        "AVR32", "mips", "OABI", "EABI", "only"
-    ]
 
-    for line in file_content.splitlines():
-        if "System call                Kernel        Notes" in line:
-            in_syscall_list = True
-            continue
-        if in_syscall_list and not line.strip():
-            break
-        if in_syscall_list:
-            match = re.match(r"(\w+)\(2\)\s+.*?(?:\s{2,}(.*))?", line.strip())
-            if match:
-                syscall_name = match.group(1)
-                notes = match.group(2) if match.group(2) else ""
 
-                # Check if any architecture keyword is in the notes
-                is_arch_specific = False
-                for keyword in arch_keywords:
-                    if keyword.lower() in notes.lower():
-                        is_arch_specific = True
-                        break
+def get_syscalls_from_json(args):
 
-                if not is_arch_specific:
-                    syscalls.append(syscall_name)
-    return syscalls
+    # 1. JSON 파일 읽기 및 예외 처리
+    try:
+        with open(args.file, 'r') as f:
+            target_syscalls = json.load(f)
+        if not isinstance(target_syscalls, list):
+            # JSON 파일의 최상위 요소가 리스트가 아니면 에러 처리
+            raise ValueError("JSON file content must be a list of syscall names.")
+    except FileNotFoundError:
+        print(f"\n[ERROR] Input file not found: {args.file}")
+        return
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"\n[ERROR] Invalid or malformed JSON file: {e}")
+        return
+        
+    base = target_syscalls
 
-# Read content from stdin
-content = sys.stdin.read()
+            
+    
+  
+    return bases
 
-syscall_names = extract_and_filter_syscall_names(content)
-output_file_path = r"C:\Users\cba72\OneDrive\바탕 화면\2025-1\generate_bpf\syscall_names.txt"
-with open(output_file_path, "w", encoding="utf-8") as f:
-    for name in syscall_names:
-        f.write(name + "\n")
+def get_args():
+    parser = argparse.ArgumentParser(description="Generate eBPF monitoring tools for specific syscalls from a JSON file.")
+    parser.add_argument(
+        "-f", "--file",
+        required=True, 
+        help="Path to a JSON file containing a list of syscall names to monitor."
+    )
+    args = parser.parse_args()
 
-print(f"Extracted {len(syscall_names)} filtered syscall names to {output_file_path}")
+    bases = get_syscalls_from_json(args)
+    
+    return special_map, bases

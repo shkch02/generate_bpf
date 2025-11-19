@@ -67,19 +67,19 @@ def make_bindings(name, types, arg_names):
     return "\n".join(lines)
 
 # --- .bpf.c 파일 생성 ---
-def generate_bpf_sources(syscalls,special_map):
+def generate_bpf_sources(bases,special_map):
     """ CSV와 템플릿을 기반으로 다수의 .bpf.c 파일을 생성 """
-    os.makedirs(BPF_DIR, exist_ok=True)
-    for alias, base in syscalls:
-        hook_name = alias
-        types, arg_names = get_syscall_info(alias)
+    os.makedirs(BPF_DIR, exist_ok=True) #BPF_DIR = ./bpf
+    for base in bases:
+        hook_name = base
+        types, arg_names = get_syscall_info(base)
         
         code = BPF_TEMPLATE.format(
             name=hook_name,
             NAME=base.upper(), # Use base name for event type for consistency
             bindings=make_bindings(base, types, arg_names)
         )
-        path = os.path.join(BPF_DIR, f"{alias}_monitor.bpf.c")
+        path = os.path.join(BPF_DIR, f"{base}_monitor.bpf.c")
         with open(path, 'w') as f:
             f.write(code)
         print(f"Generated {path}")
