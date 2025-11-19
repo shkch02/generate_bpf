@@ -104,7 +104,7 @@ def generate_loader(bases):
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
         case_str = f"        case EVT_{base.upper()}:\n"
         
-        types, arg_names = get_syscall_info(bases)
+        types, arg_names = get_syscall_info(base)
 
         ##typ 변수형 리스트를 받아서, 각 typ의 변수형을 반환하는 함수 필요할거 같음 지금 if else로는 제대로 필터링하지 못함 
 
