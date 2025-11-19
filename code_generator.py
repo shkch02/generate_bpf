@@ -153,7 +153,7 @@ def generate_loader(bases):
         event_cases.append(case_str)
 
     # Generate includes, skeletons, etc. for each alias
-    for bases in bases:
+    for alias in bases:
         includes.append(f'#include "bpf/{alias}_monitor.skel.h"')
         skeletons.append(f"    struct {alias}_monitor_bpf *{alias}_skel = NULL;")
         attaches.append(textwrap.dedent(f"""
