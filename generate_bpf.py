@@ -30,23 +30,21 @@ from code_generator import (
 
 
 def main():
-    #1 입력인자 처리
     bases = get_args()
-
-    # 4. 각 코드/파일 생성 함수 순차 호출 (code_generator.py에 위임)
+    #TODO 지금은 list로 받지만, 나중엔 인자 포함된 dict로 받아서 처리할테니 인자를 여기서 처리하고 코드에 넣어줘야할듯
+    #get_syscall_info 삭제하고 인자 리스트 넣어주면 될듯
     print("\nGenerating BPF common header...")
-    generate_common_event_bpf(bases)
+    generate_common_event_bpf(bases) #인자 사용하는 버전으로 수정 필요
 
     print("Generating user-space common header...")
-    generate_common_event_user(bases)
+    generate_common_event_user(bases)#인자 사용하는 버전으로 수정 필요
 
     print("Generating BPF source files...")
-    generate_bpf_sources(bases)
+    generate_bpf_sources(bases) #인자 사용하는 버전으로 수정 필요
 
     print("Generating Makefile and Loader source...")
     generate_makefile(bases)
     generate_loader(bases)
-    #모니터로더 static void fprint_json_escaped_str 함수 인코딩 문제인지 암튼 여기 해결해야함
 
     print("\n✅ Generation complete. Run 'make' to build.")
 
