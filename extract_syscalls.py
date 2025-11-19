@@ -20,10 +20,7 @@ def get_syscalls_from_json(args):
         print(f"\n[ERROR] Invalid or malformed JSON file: {e}")
         return
         
-    base = target_syscalls
-
-            
-    
+    bases = target_syscalls
   
     return bases
 
@@ -38,4 +35,4 @@ def get_args():
 
     bases = get_syscalls_from_json(args)
     
-    return special_map, bases
+    return bases
