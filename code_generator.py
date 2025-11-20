@@ -86,7 +86,7 @@ def generate_bpf_sources(bases):
 
 # --- Makefile 생성 ---
 def generate_makefile(bases):
-    mk = MAKEFILE.format(bases=' '.join(bases))
+    mk = MAKEFILE.format(targets=' '.join(bases))
     with open(os.path.join(OUT_DIR, 'Makefile'), 'w') as f:
         f.write(mk)
     print("Generated Makefile")
