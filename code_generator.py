@@ -35,7 +35,7 @@ KERNEL_TYPE_MAP = {
     }
 
 # --- 인자 바인딩 생성 ---
-def make_bindings(name, types, arg_names):
+def make_bindings(bases, types, arg_names):
     lines = []
     for idx, (typ, var) in enumerate(zip(types, arg_names), start=1):
         parm = f"ctx->args[{idx-1}]"
@@ -45,24 +45,24 @@ def make_bindings(name, types, arg_names):
 
         # 1) 배열, struct timeval/timespec, 또는 (char* 제외) 포인터 -> 주소값을 읽어온다.(구조체)
         if core in ('struct timeval','struct timespec') or is_array or (is_ptr and core != 'char'):
-            lines.append(f"    e->data.{name}.{var}_ptr = (u64){parm};")
+            lines.append(f"    e->data.{bases}.{var}_ptr = (u64){parm};")
             continue
 
         # 2) 문자열(char*) 포인터 → 사용자 공간에서 문자열 복사
         if is_ptr and core == 'char':
             lines.append(
-                f"    bpf_probe_read_user_str(&e->data.{name}.{var}, "
-                f"sizeof(e->data.{name}.{var}), (void*){parm});")
+                f"    bpf_probe_read_user_str(&e->data.{bases}.{var}, "
+                f"sizeof(e->data.{bases}.{var}), (void*){parm});")
             continue
 
         # 3) 일반 typedef → 매핑된 커널 타입으로 캐스트
         if core in KERNEL_TYPE_MAP:
             ktype = KERNEL_TYPE_MAP[core]
-            lines.append(f"    e->data.{name}.{var} = ({ktype}){parm};")
+            lines.append(f"    e->data.{bases}.{var} = ({ktype}){parm};")
             continue
 
         # 4) 나머지 기본 타입 → 그대로 캐스트
-        lines.append(f"    e->data.{name}.{var} = ({typ}){parm};")
+        lines.append(f"    e->data.{bases}.{var} = ({typ}){parm};")
 
     return "\n".join(lines)
 
@@ -85,13 +85,11 @@ def generate_bpf_sources(bases):
         print(f"Generated {path}")
 
 # --- Makefile 생성 ---
-def generate_makefile(targets):
-    mk = MAKEFILE.format(targets=' '.join(targets))
+def generate_makefile(bases):
+    mk = MAKEFILE.format(bases=' '.join(bases))
     with open(os.path.join(OUT_DIR, 'Makefile'), 'w') as f:
         f.write(mk)
     print("Generated Makefile")
-
-    # --- 로더 C 코드 생성 ---
 
 # --- _loader.c 생성 ---
 def generate_loader(bases):
@@ -152,21 +150,20 @@ def generate_loader(bases):
         case_str += "            break;"
         event_cases.append(case_str)
 
-    # Generate includes, skeletons, etc. for each alias
-    for alias in bases:
-        includes.append(f'#include "bpf/{alias}_monitor.skel.h"')
-        skeletons.append(f"    struct {alias}_monitor_bpf *{alias}_skel = NULL;")
+    for base in bases:
+        includes.append(f'#include "bpf/{base}_monitor.skel.h"')
+        skeletons.append(f"    struct {base}_monitor_bpf *{base}_skel = NULL;")
         attaches.append(textwrap.dedent(f"""
-    {alias}_skel = {alias}_monitor_bpf__open_and_load();
-    if (!{alias}_skel) {{
-        fprintf(stderr, "Failed to open and load {alias} skeleton\\n");
+    {base}_skel = {base}_monitor_bpf__open_and_load();
+    if (!{base}_skel) {{
+        fprintf(stderr, "Failed to open and load {base} skeleton\\n");
         goto cleanup;
     }}
-    if ({alias}_monitor_bpf__attach({alias}_skel) != 0) {{
-        fprintf(stderr, "Failed to attach {alias} skeleton\\n");
+    if ({base}_monitor_bpf__attach({base}_skel) != 0) {{
+        fprintf(stderr, "Failed to attach {base} skeleton\\n");
         goto cleanup;
     }}"""))
-        destroys.append(f"    if ({alias}_skel) {alias}_monitor_bpf__destroy({alias}_skel);")
+        destroys.append(f"    if ({base}_skel) {base}_monitor_bpf__destroy({base}_skel);")
 
 # [추가] Cgroup 스캐너 스레드 초기화/종료 코드 생성
     cgroup_scanner_init_code = ""
@@ -179,12 +176,12 @@ def generate_loader(bases):
         ]
 
         # [수정] 
-        # aliases 리스트를 순회하며 5개의 맵 FD를 모두 가져오는 C 코드를 생성
+        # bases 리스트를 순회하며 5개의 맵 FD를 모두 가져오는 C 코드를 생성
         # 예: g_map_fds[0] = bpf_map__fd(close_skel->maps.cgroup_map);
         #     g_map_fds[1] = bpf_map__fd(lseek_skel->maps.cgroup_map);
         #     ...
-        for i, alias in enumerate(bases):
-            skel_name = f"{alias}_skel"
+        for i, base in enumerate(bases):
+            skel_name = f"{base}_skel"
             init_lines.append(f"    g_map_fds[{i}] = bpf_map__fd({skel_name}->maps.cgroup_map);")
 
         # [수정] 
@@ -236,7 +233,7 @@ def generate_loader(bases):
         f.write(loader)
     print("Generated monitor_loader.c")
 
-def _generate_common_event_content(targets,template):
+def _generate_common_event_content(bases,template):
     enum_lines, enum_strings, struct_lines, union_lines = [], [], [], []
     #unique_bases = df['syscall name'].unique()
 
@@ -260,7 +257,7 @@ def _generate_common_event_content(targets,template):
      # pid_t, uid_t 등은 위 typedef 매핑에서 처리
     }
 
-    for base in targets:
+    for base in bases:
         upper_base = base.upper()
         enum_lines.append(f"    EVT_{upper_base},")
         enum_strings.append(f"    [EVT_{upper_base}] = \"{base}\",")
@@ -311,9 +308,9 @@ def _generate_common_event_content(targets,template):
     return content
 
 # --- common_event.h 생성 ---
-def generate_common_event_bpf(targets):
+def generate_common_event_bpf(bases):
     # 1. BPF용 템플릿(BPF_HEADER)을 사용하여 공통 함수 호출
-    content = _generate_common_event_content(targets, BPF_HEADER)
+    content = _generate_common_event_content(bases, BPF_HEADER)
 
     # 2. BPF용 경로(EVENT_HDR)에 파일 작성
     os.makedirs(os.path.dirname(EVENT_HDR), exist_ok=True)
@@ -321,8 +318,8 @@ def generate_common_event_bpf(targets):
         f.write(content)
     print(f"Generated {EVENT_HDR}")    
 
-def generate_common_event_user(targets):
-    content = _generate_common_event_content(targets, USER_HEADER)
+def generate_common_event_user(bases):
+    content = _generate_common_event_content(bases, USER_HEADER)
 
     os.makedirs(os.path.dirname(EVENT_HDR_USER), exist_ok=True)
     with open(EVENT_HDR_USER, 'w') as f:
