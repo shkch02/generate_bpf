@@ -99,7 +99,7 @@ LOADER_TEMPLATE = textwrap.dedent("""
 #include <signal.h>
 #include <unistd.h>
 #include <bpf/libbpf.h>
-//#include <librdkafka/rdkafka.h>       //***********KAFKA*************
+#include <librdkafka/rdkafka.h>       //***********KAFKA*************
 #include <pthread.h>      /* [추가] */
 #include <ftw.h>          /* [추가] */
 #include <errno.h>        /* [추가] */
@@ -110,8 +110,8 @@ LOADER_TEMPLATE = textwrap.dedent("""
 // bpf 모니터링 스켈레톤 헤더들 생성위치 조정필요
 
 static volatile bool running = true;
-//static rd_kafka_t *rk;            //***********KAFKA*************
-//static rd_kafka_topic_t *rkt;     //***********KAFKA*************
+static rd_kafka_t *rk;            //***********KAFKA*************
+static rd_kafka_topic_t *rkt;     //***********KAFKA*************
 static int g_map_fds[{num_syscalls}] = {{{num_0f_minus1s}}}; 
 static const char *event_type_str[] = {{
 {enum_strings}
@@ -124,7 +124,7 @@ void sig_handler(int sig) {{
 
 
 //***********KAFKA*************                                  
-/*
+
 // IMPROVEMENT: Kafka delivery report callback
 static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
     if (rkmessage->err) {{
@@ -136,7 +136,10 @@ static void kafka_init() {{
     char errstr[512];
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
 
-    if (rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092", errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
+    const char* kafka_topic = getenv("KAFKA_TOPIC");
+    const char *kafka_brokers = getenv("KAFKA_BOOTSTRAP_SERVERS")
+                                  
+    if (rd_kafka_conf_set(conf, "bootstrap.servers", kafka_brokars, errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
         fprintf(stderr, "%s\\n", errstr);
         exit(1);
     }}
@@ -148,7 +151,7 @@ static void kafka_init() {{
         fprintf(stderr, "Failed to create new producer: %s\\n", errstr);
         exit(1);
     }}
-    rkt = rd_kafka_topic_new(rk, "syscall_events", NULL);
+    rkt = rd_kafka_topic_new(rk, kafka_topic, NULL);
 }}
 
 static void kafka_send(const char* buffer, size_t len) {{
@@ -159,17 +162,7 @@ static void kafka_send(const char* buffer, size_t len) {{
     rd_kafka_poll(rk, 0);
                                   
     //printf("%s\\n", buffer);
-}}*/
-                                  
-
-//***********KAFKA************* when kafka is adapted, delete this function
-static void stdout_send(const char* buffer, size_t len) {{
-    if (!buffer || len == 0) return;
-    printf("%s\\n", buffer);
 }}
-                                  
-
-
 
 /* [추가] Cgroup 스캔 콜백 함수 (PoC 로직) */
 static int dir_scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {{
@@ -262,8 +255,7 @@ static void serialize_and_send(const struct event_t *e) {{
     fclose(f);
 
     //***********KAFKA*************
-    //kafka_send(buf, size);
-    stdout_send(buf, size);
+    kafka_send(buf, size);
     free(buf);
 }}
 
@@ -306,7 +298,7 @@ int main() {{
                 break; // 에러 발생 시 외부 루프도 종료
             }}
         }}
-        //rd_kafka_poll(rk, 0);
+        rd_kafka_poll(rk, 0);
         // CPU 사용을 줄이기 위해 잠시 대기
         usleep(1000);
     }}
@@ -321,9 +313,9 @@ cleanup:
     {destroys}
     fprintf(stderr, "\\nFlushing final Kafka messages...\\n");
    //***********KAFKA*************
-    //rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
-    //rd_kafka_topic_destroy(rkt);
-    //rd_kafka_destroy(rk);
+    rd_kafka_flush(rk, 10 * 1000); // Wait for max 10 seconds
+    rd_kafka_topic_destroy(rkt);
+    rd_kafka_destroy(rk);
     printf("Cleaned up resources.\\n");
     return 0;
 }}
