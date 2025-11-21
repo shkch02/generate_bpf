@@ -271,7 +271,7 @@ int main() {{
     signal(SIGTERM, sig_handler);
 
 //***********KAFKA*************
-//   kafka_init();
+   kafka_init();
 
     {skeletons}
     struct ring_buffer *rbs[{num_syscalls}];
