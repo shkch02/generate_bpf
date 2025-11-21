@@ -26,6 +26,11 @@ spec:
       containers:
       - name: moanitorloader-agent
         image: shkch.duckdns.org/monitor_loader/monitorloader:latest
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: my-cluster-kafka-bootstrap.kafka.svc:9092
+        - name: KAFKA_TOPIC
+          value: syscall_events
         imagePullPolicy: Always
         # BPF 로더가 커널과 상호작용할 수 있도록 특권 모드 설정
         securityContext:
