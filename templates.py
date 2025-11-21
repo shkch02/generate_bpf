@@ -137,8 +137,10 @@ static void kafka_init() {{
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
 
     const char* kafka_topic = getenv("KAFKA_TOPIC");
+    if (!kafka_topic) {{ kafka_topic = "syscall_events"; }}
     const char *kafka_brokers = getenv("KAFKA_BOOTSTRAP_SERVERS");
-                                  
+    if (!kafka_brokers) {{ kafka_brokers = "my-cluster-kafka-bootstrap.kafka.svc:9092"; }}
+
     if (rd_kafka_conf_set(conf, "bootstrap.servers", kafka_brokers, errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
         fprintf(stderr, "%s\\n", errstr);
         exit(1);

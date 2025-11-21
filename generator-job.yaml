@@ -1,0 +1,37 @@
+# analyzer-job.yaml (수정됨)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ebpf-generate-job
+spec:
+  template:
+    spec:
+      # 💡 imagePullSecrets와 serviceAccountName이 바로 이 위치에 추가됩니다.
+      imagePullSecrets:
+      - name: harbor-creds
+      serviceAccountName: elf-analyzer-sa
+
+      containers:
+      - name: analyzer
+        # 2단계에서 빌드하고 푸시한 이미지 주소
+        image: shkch.duckdns.org/elf_analyzer/elf-analyzer:latest
+        
+        # main.go의 os.Args[1]로 전달될 인자
+        args:
+          - "/syscalltest2" 
+          
+        env:
+          # 1. config.go의 LoadRedisAddr()가 사용할 주소
+          - name: CCSL_REDIS_ADDR
+            value: "redis-ccsl-svc:6379"
+            
+          # 2. config.go의 LoadRedisPassword()가 사용할 비밀번호
+          - name: CCSL_REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: redis-ccsl-secret
+                key: redis-password
+                
+      # Job이 실패하면 재시도하지 않음 (또는 OnFailure)
+      restartPolicy: Never
+  backoffLimit: 1 # 실패 시 재시도 횟수   
