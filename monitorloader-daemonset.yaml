@@ -1,0 +1,60 @@
+  apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: monitorloader-daemonset
+  labels:
+    app: monitorloader
+spec:
+  selector:
+    matchLabels:
+      app: monitorloader
+  template:
+    metadata:
+      labels:
+        app: monitorloader
+    spec:
+      imagePullSecrets:
+      - name: harbor-creds
+      serviceAccountName: admin-server-sa
+      # eBPF 프로그램은 호스트 커널 인터페이스와 상호작용해야 하므로
+      # 특권 모드(Privileged Mode)가 필요합니다.
+      hostPID: true
+      hostIPC: true
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: moanitorloader-agent
+        image: shkch.duckdns.org/monitor_loader/monitorloader:latest
+        imagePullPolicy: Always
+        # BPF 로더가 커널과 상호작용할 수 있도록 특권 모드 설정
+        securityContext:
+          privileged: true
+        # libbpf의 기능을 위해 필요한 호스트 파일 시스템 볼륨 마운트
+        volumeMounts:
+        - name: kernel-debugfs
+          mountPath: /sys/kernel/debug
+          readOnly: true
+        - name: fs-cgroup
+          mountPath: /sys/fs/cgroup
+        # eBPF 로더 실행 파일과 인자를 지정 (Dockerfile의 CMD와 일치)
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "2000m"
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+      # 호스트 파일 시스템 볼륨 정의
+      volumes:
+      # eBPF 맵, 핀(pin) 등을 위해 /sys/fs/bpf를 마운트합니다.
+      # BPF FS가 마운트되지 않은 경우 Kubernetes가 자동으로 마운트할 수 있도록 EmptyDir 사용
+      - name: fs-cgroup
+        hostPath:
+          path: /sys/fs/cgroup
+          type: Directory
+      # BPF 디버깅 및 일부 헬퍼 함수를 위해 /sys/kernel/debug를 마운트합니다. (읽기 전용)
+      - name: kernel-debugfs
+        hostPath:
+          path: /sys/kernel/debug
+          type: Directory
