@@ -9,7 +9,8 @@ pipeline {
         MONITOR_IMAGE_NAME  = "kafka"
         KUBE_CREDS_ID = "kubeconfig-creds"
         LOADER_DOCKERFILE = "loader.Dockerfile"
-        IMAGE_NAME = "monitor_loader"
+        IMAGE_NAME = "monitorloader"
+        DAEMONSET_YAML_FILE = "monitorloader-daemonset.yaml"
 
         // 2. SSH 터널링/K8s 접속 정보를 환경 변수로 이동 (def 제거)
         K8S_USER = "server4"
@@ -78,7 +79,7 @@ pipeline {
                             KUBECONFIG_PATH = env.KUBECONFIG_FILE
                             
                                                         
-                            sh "sed -i '/image: .*${env.IMAGE_NAME}:.*/c\\            image: ${FULL_IMAGE_PATH}' ${env.DAEMONSET_YAML}"
+                            sh "sed -i 's|image:.*${env.IMAGE_NAME}:latest|image: ${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}|g' ${DAEMONSET_YAML_FILE}"
 
                             echo "Deploying DaemonSet with image tag: ${env.IMAGE_TAG}"
 
