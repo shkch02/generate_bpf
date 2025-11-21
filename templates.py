@@ -142,7 +142,7 @@ static void kafka_init() {{
     if (rd_kafka_conf_set(conf, "bootstrap.servers", kafka_brokars, errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
         fprintf(stderr, "%s\\n", errstr);
         exit(1);
-    }}
+    }}  
     // Set delivery report callback
     rd_kafka_conf_set_dr_msg_cb(conf, dr_msg_cb);
 
