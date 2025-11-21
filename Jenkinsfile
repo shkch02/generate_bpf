@@ -61,7 +61,7 @@ pipeline {
                     def localPort = 8888 
                     def KUBECONFIG_PATH
                     def tunnelPid
-
+                    def FULL_IMAGE_PATH = "${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                     // 1. SSH 터널 시작과 인증서 주입
                     sshagent(['k8s-master-ssh-key']) {
                         
