@@ -84,7 +84,7 @@ pipeline {
                             echo "Deploying DaemonSet with image tag: ${env.IMAGE_TAG}"
 
                             // 3. kubectl apply 실행 (수정된 YAML 파일 사용)
-                            sh 'KUBECONFIG=${KUBECONFIG_PATH} kubectl apply -f ${env.DAEMONSET_YAML}' 
+                            sh "KUBECONFIG=${KUBECONFIG_PATH} kubectl apply -f ${env.DAEMONSET_YAML}"
                             
                             // 4. 강제 롤아웃 재시작
                             sh "KUBECONFIG=${KUBECONFIG_PATH} kubectl rollout restart daemonset monitorloader-daemonset -n default "
