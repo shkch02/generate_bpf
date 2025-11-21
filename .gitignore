@@ -2,10 +2,9 @@ temp_syscalls.txt
 syscalls_man_page.txt
 data.capset.hdrp)
 data.capset.datap)
-log.txt
+log.txt 
 syscalls_man_page.txt
 temp_syscalls.txt
 ts_ns
 코드 개편안.txt
-vmlinux.h
 man2syscalls.txt
