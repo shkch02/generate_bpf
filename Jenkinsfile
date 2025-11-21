@@ -95,7 +95,7 @@ pipeline {
             }
         }
     }
-    }
+    
     post {
         always {
             sh "docker logout ${env.HARBOR_URL}"
