@@ -281,7 +281,7 @@ static void serialize_and_send(const struct event_t *e) {{
     fclose(f);
 
                                   
-    //stdout_send(buf, size){printf("%s\n", buffer);} 하면 콘솔에 출력 됨, 버퍼에 메세지는 정상적으로 간다는 소리
+    //stdout_send(buf, size) 하면 콘솔에 출력 됨, buf에는 정상적인 json 문자열이 들어있음
     //***********KAFKA*************
     //여기 디버깅코드 넣으니까 반복되긴함
     kafka_send(buf, size);
