@@ -183,6 +183,8 @@ static void kafka_send(const char* buffer, size_t len) {{
     // )
     rd_kafka_produce(rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, (void*)buffer, len, NULL, 0, NULL);
     // Poll for delivery reports (and other events).
+                                  
+    //위의 프로듀스로 생성된 메세지를 네트워크를 통해 실제로 전송
     rd_kafka_poll(rk, 0);
                                   
     //printf("%s\\n", buffer);
@@ -278,6 +280,8 @@ static void serialize_and_send(const struct event_t *e) {{
     fprintf(f, "}}");
     fclose(f);
 
+                                  
+    //stdout_send(buf, size){printf("%s\n", buffer);} 하면 콘솔에 출력 됨, 버퍼에 메세지는 정상적으로 간다는 소리
     //***********KAFKA*************
     //여기 디버깅코드 넣으니까 반복되긴함
     kafka_send(buf, size);
