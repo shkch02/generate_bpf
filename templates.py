@@ -129,7 +129,7 @@ void sig_handler(int sig) {{
 static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void *opaque) {{
     if (rkmessage->err) {{
         fprintf(stderr, " Message delivery failed: %s\\n", rd_kafka_err2str(rkmessage->err));
-    }}
+    }} else{{fprintf(stderr, " Message delivered to topic %s [%d] at offset %lld\\n",}}
 }}
 
 static void kafka_init() {{
@@ -142,7 +142,11 @@ static void kafka_init() {{
     const char *kafka_bootstrap = getenv("KAFKA_BOOTSTRAP_SERVERS");
     if (!kafka_bootstrap) {{ kafka_bootstrap = "my-cluster-kafka-bootstrap.kafka.svc:9092"; }}
 
-    //설정 객체에 부트스트랩 서버 설정입력
+    //rd_kafka_conf_set{설정 객체에 부트스트랩 서버 설정입력
+    //conf : 설정 객체
+    //"bootstrap.servers" : 설정 키 <- 뭐임?
+    //kafka_bootstrap : 설정 값
+    //errstr, sizeof(errstr) : 오류 발생 시 오류 메시지 저장 버퍼 
     if (rd_kafka_conf_set(conf, "bootstrap.servers", kafka_bootstrap, errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
         fprintf(stderr, "%s\\n", errstr);
         exit(1);
@@ -171,8 +175,9 @@ static void kafka_init() {{
 static void kafka_send(const char* buffer, size_t len) {{
     //빈 버퍼 또는 길이 0인 경우 오류처리
     if (!buffer || len == 0) return;
-                                  
-    fprintf(stderr,"debug Kafka_send\\n");
+
+    //여까진 정상적으로 찍히는거확인 ( 아래 주석 풀면 메세지 존나나옴)                            
+    //fprintf(stderr,"debug Kafka_send\\n");
                                   
     // rd_kafka_produce(
     // rkt : 토픽 객체 지정
@@ -187,6 +192,7 @@ static void kafka_send(const char* buffer, size_t len) {{
     // Poll for delivery reports (and other events).
                                   
     //위의 프로듀스로 생성된 메세지를 네트워크를 통해 실제로 전송
+    //결과는 dr_msg_cb 콜백함수로 비동기적으로 전달
     rd_kafka_poll(rk, 0);
                                   
     //printf("%s\\n", buffer);
