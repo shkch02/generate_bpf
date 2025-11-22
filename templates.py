@@ -268,6 +268,7 @@ static int on_event(void *ctx, void *data, size_t size) {{
 }}
 
 int main() {{
+    bool scanner_started = false;
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
 
