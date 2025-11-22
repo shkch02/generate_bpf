@@ -237,7 +237,7 @@ static void fprint_json_escaped_str(FILE *f, const char *s) {{
     fputc('"', f);
 }}
 
-// IMPROVEMENT: Robust JSON serialization for each event type
+// 링버퍼로부터 수신한 데이터 JSON 직렬화 및 전송
 static void serialize_and_send(const struct event_t *e) {{
     char *buf = NULL;
     size_t size = 0;
@@ -261,6 +261,7 @@ static void serialize_and_send(const struct event_t *e) {{
     free(buf);
 }}
 
+// 콜백 함수: 링버퍼에서 이벤트 수신 시 호출되는 함수
 static int on_event(void *ctx, void *data, size_t size) {{
     serialize_and_send((const struct event_t *)data);
     return 0;
@@ -280,6 +281,8 @@ int main() {{
     /* [추가] 스캐너 스레드 초기화 (code_generator.py에서 생성) */
     {cgroup_scanner_init}
 
+                                  
+    //ring_buffer_new : 각 시스콜에 대해 링버퍼 생성하고, 콜백함수등록(on_event)
     {rbs_initializers}
 
     for (int i = 0; i < {num_syscalls}; i++) {{
@@ -295,6 +298,7 @@ int main() {{
     while (running) {{
         for (int i = 0; i < {num_syscalls}; i++) {{
             // non-blocking으로 모든 버퍼를 빠르게 순회하기 위해 timeout을 짧게 설정 (예: 1ms)
+            //ring_buffer_poll : 이벤트가 있으면 rbs[i]의 콜백 함수(on_event)를 호출
             if (ring_buffer__poll(rbs[i], 1) < 0) {{
                 fprintf(stderr, "Error polling ring buffer %d\\n", i);
                 break; // 에러 발생 시 외부 루프도 종료

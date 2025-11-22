@@ -172,7 +172,7 @@ def generate_loader(bases):
         
         # C 코드를 담을 리스트
         init_lines = [
-            "    pthread_t tid;"
+            "    pthread_t tid; scanner_started = true;"
         ]
 
         # [수정] 
