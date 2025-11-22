@@ -172,6 +172,8 @@ static void kafka_send(const char* buffer, size_t len) {{
     //빈 버퍼 또는 길이 0인 경우 오류처리
     if (!buffer || len == 0) return;
                                   
+    //fprintf("debug Kafka_send: %s\\n", buffer);
+                                  
     // rd_kafka_produce(
     // rkt : 토픽 객체 지정
     // RD_KAFKA_PARTITION_UA : 파티션 자동 할당
