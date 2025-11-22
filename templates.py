@@ -271,7 +271,7 @@ int main() {{
     bool scanner_started = false;
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
-
+    fprintf(stderr, "monitor_loader running...\\n");
 //***********KAFKA*************
    kafka_init();
 

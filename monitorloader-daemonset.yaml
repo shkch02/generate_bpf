@@ -21,7 +21,7 @@ spec:
       hostPID: true
       hostIPC: true
       hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirstWithHostNet # 호스트 네트워크 사용 시 DNS 정책 설정
       tolerations:
       - operator: Exists
       containers:
