@@ -257,7 +257,9 @@ static void serialize_and_send(const struct event_t *e) {{
     fclose(f);
 
     //***********KAFKA*************
+    fprintf(stderr, "debug 9 : before kafka_sand\\n");
     kafka_send(buf, size);
+    fprintf(stderr, "debug 10 : after kafka_sand\\n");
     free(buf);
 }}
 
