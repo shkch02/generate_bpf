@@ -134,31 +134,53 @@ static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void 
 
 static void kafka_init() {{
     char errstr[512];
-    rd_kafka_conf_t *conf = rd_kafka_conf_new();
+    rd_kafka_conf_t *conf = rd_kafka_conf_new(); //설정 객체 생성
 
+    //환경변수 로드
     const char* kafka_topic = getenv("KAFKA_TOPIC");
     if (!kafka_topic) {{ kafka_topic = "syscall_events"; }}
     const char *kafka_bootstrap = getenv("KAFKA_BOOTSTRAP_SERVERS");
     if (!kafka_bootstrap) {{ kafka_bootstrap = "my-cluster-kafka-bootstrap.kafka.svc:9092"; }}
 
+    //설정 객체에 부트스트랩 서버 설정입력
     if (rd_kafka_conf_set(conf, "bootstrap.servers", kafka_bootstrap, errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
         fprintf(stderr, "%s\\n", errstr);
         exit(1);
     }}  
-    // Set delivery report callback
+                                  
+    //전송완료 콜백함수 dr_msg_cb 등록
     rd_kafka_conf_set_dr_msg_cb(conf, dr_msg_cb);
 
+    //설정객체 conf를 사용하여 프로듀서 객체 생성, RD_KAFKA_PRODUCER 타입으로 지정
+    //프로듀서 객체가 정확히 뭔데? : 메시지를 카프카 클러스터로 보내는 역할
     rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
     if (!rk) {{
         fprintf(stderr, "Failed to create new producer: %s\\n", errstr);
         exit(1);
     }}
+                                  
+    //토픽 객체 생성
+    //토픽 객체 : 메시지를 보낼 특정 카프카 토픽을 지정
     rkt = rd_kafka_topic_new(rk, kafka_topic, NULL);
+    if (!rkt) {{
+        fprintf(stderr, "Failed to create new topic : %s\\n", errstr);
+        exit(1);
+    }}
 }}
 
 static void kafka_send(const char* buffer, size_t len) {{
+    //빈 버퍼 또는 길이 0인 경우 오류처리
     if (!buffer || len == 0) return;
-    // RD_KAFKA_MSG_F_COPY makes a copy of the payload.
+                                  
+    // rd_kafka_produce(
+    // rkt : 토픽 객체 지정
+    // RD_KAFKA_PARTITION_UA : 파티션 자동 할당
+    // RD_KAFKA_MSG_F_COPY : 메시지 데이터를 내부적으로 복사
+    // (void*)buffer : 전송할 메시지 데이터
+    // len : 메시지 길이
+    // NULL, 0 : 키 없음
+    // NULL : 추가 옵션 없음
+    // )
     rd_kafka_produce(rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, (void*)buffer, len, NULL, 0, NULL);
     // Poll for delivery reports (and other events).
     rd_kafka_poll(rk, 0);
@@ -257,6 +279,7 @@ static void serialize_and_send(const struct event_t *e) {{
     fclose(f);
 
     //***********KAFKA*************
+    //여기 디버깅코드 넣으니까 반복되긴함
     kafka_send(buf, size);
     free(buf);
 }}
