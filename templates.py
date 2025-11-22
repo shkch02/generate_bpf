@@ -300,6 +300,7 @@ fprintf(stderr, "debug 7\\n");
 
 
    printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
+    fprintf(stderr, "debug 8\\n");  
     while (running) {{
         for (int i = 0; i < {num_syscalls}; i++) {{
             // non-blocking으로 모든 버퍼를 빠르게 순회하기 위해 timeout을 짧게 설정 (예: 1ms)
