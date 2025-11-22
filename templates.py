@@ -315,6 +315,7 @@ fprintf(stderr, "debug 7\\n");
     }}
 
 cleanup:
+         fprintf(stderr, "debug cleanup\\n");                         
     /* [추가] 스캐너 스레드 종료 대기 */
     {cgroup_scanner_join}
                                   
