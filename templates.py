@@ -271,28 +271,32 @@ int main() {{
     bool scanner_started = false;
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
-    fprintf(stderr, "monitor_loader running...\\n");
+        
 //***********KAFKA*************
    kafka_init();
 
+fprintf(stderr, "debug 1\\n");
     {skeletons}
+fprintf(stderr, "debug 2\\n");
     struct ring_buffer *rbs[{num_syscalls}];
+fprintf(stderr, "debug 3\\n");
     {attaches}
 
+fprintf(stderr, "debug 4\\n");
     /* [추가] 스캐너 스레드 초기화 (code_generator.py에서 생성) */
     {cgroup_scanner_init}
 
-                                  
+fprintf(stderr, "debug 5\\n");               
     //ring_buffer_new : 각 시스콜에 대해 링버퍼 생성하고, 콜백함수등록(on_event)
     {rbs_initializers}
-
+fprintf(stderr, "debug 6\\n");
     for (int i = 0; i < {num_syscalls}; i++) {{
     if (!rbs[i]) {{
         fprintf(stderr, "Failed to create ring buffer for syscall %d\\n", i);
         goto cleanup;
         }}
     }}
-
+fprintf(stderr, "debug 7\\n");
 
 
    printf("Monitoring syscalls... Press Ctrl+C to exit.\\n\\n");
