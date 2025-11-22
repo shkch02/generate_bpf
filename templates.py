@@ -142,11 +142,11 @@ static void kafka_init() {{
     const char *kafka_bootstrap = getenv("KAFKA_BOOTSTRAP_SERVERS");
     if (!kafka_bootstrap) {{ kafka_bootstrap = "my-cluster-kafka-bootstrap.kafka.svc:9092"; }}
 
-    //rd_kafka_conf_set{설정 객체에 부트스트랩 서버 설정입력
-    //conf : 설정 객체
-    //"bootstrap.servers" : 설정 키 <- 뭐임?
-    //kafka_bootstrap : 설정 값
-    //errstr, sizeof(errstr) : 오류 발생 시 오류 메시지 저장 버퍼 
+    // rd_kafka_conf_set 설정 객체에 부트스트랩 서버 설정입력
+    // conf : 설정 객체
+    // "bootstrap.servers" : 설정 키 <- 뭐임?
+    // kafka_bootstrap : 설정 값
+    // errstr, sizeof(errstr) : 오류 발생 시 오류 메시지 저장 버퍼 
     if (rd_kafka_conf_set(conf, "bootstrap.servers", kafka_bootstrap, errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
         fprintf(stderr, "%s\\n", errstr);
         exit(1);
