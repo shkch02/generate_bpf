@@ -15,9 +15,9 @@ pipeline {
             steps{
                 script { 
                     def NODE_MAP = [
-                        'k8s-worker1': [user: 'server1', dir: '/home/server1/2025-1/generate_bpf'],
-                        'k8s-worker2': [user: 'server2', dir: '/home/server2/2025-1/generate_bpf'],
-                        'k8s-master':  [user: 'server4', dir: '/home/server4/2025-1/generate_bpf']
+                        'k8s-worker1': [user: 'server1', dir: '/home/server1/generate_bpf'],
+                        'k8s-worker2': [user: 'server2', dir: '/home/server2/generate_bpf'],
+                        'k8s-master':  [user: 'server4', dir: '/home/server4/generate_bpf']
                     ]
                     
                     def nodes_list = NODE_MAP.keySet()
