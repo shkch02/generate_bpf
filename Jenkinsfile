@@ -59,11 +59,11 @@ pipeline {
                                     // SSH 접속은 사용자@노드별칭 형태로 실행됩니다.
                                     // 이 때, ~/.ssh/config 파일에 등록된 별칭(k8s-worker1 등)이 사용되어 점프 호스트를 경유합니다.
                                     sh "ssh -o StrictHostKeyChecking=no -i ${KEY_FILE} ${remote_host_alias} ${remoteCommands}"
-                                }  
+                                }
                             }]  
                         }
-                    )   
-                }       
+                    )
+                } 
             }
         }
     } 
