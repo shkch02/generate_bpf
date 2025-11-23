@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // 환경 변수는 단순 문자열로 유지합니다.
+        // 환경 변수는 단순 문자열로 유지합니다.시발
         KAFKA_BOOTSTRAP_SERVERS = "192.168.0.8:30719"
     }
 
