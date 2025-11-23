@@ -30,7 +30,7 @@ pipeline {
                                 def agent_dir = node_info.dir
                                 def remote_host_alias = "${ssh_user}@${node_alias}"
                                 
-                                withCredentials([sshUserPrivateKey(credentialsId: 'k8s-master-ssh-key', keyFileVariable: 'KEY_FILE')]){
+                                withCredentials([sshUserPrivateKey(credentialsId: 'jenkins-ssh', keyFileVariable: 'KEY_FILE')]){
                                     def remoteCommands = """
                                         set -e
                                         
