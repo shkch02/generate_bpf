@@ -277,7 +277,7 @@ static void serialize_and_send(const struct event_t *e) {{
     if (!f) return;
 
     fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu", event_type_str[e->type], e->pid, e->ts_ns);
-
+    fprintf(stderr, "debug pathname: %s\n", e->data.openat.pathname);
     // Event-specific data
     switch (e->type) {{
 {event_cases}
