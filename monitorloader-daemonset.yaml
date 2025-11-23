@@ -43,6 +43,8 @@ spec:
           readOnly: true
         - name: fs-cgroup
           mountPath: /sys/fs/cgroup
+        - name: fs-bpf
+          mountPath: /sys/fs/bpf
         # eBPF 로더 실행 파일과 인자를 지정 (Dockerfile의 CMD와 일치)
         resources:
           limits:
@@ -63,4 +65,8 @@ spec:
       - name: kernel-debugfs
         hostPath:
           path: /sys/kernel/debug
+          type: Directory
+      - name: fs-bpf
+        hostPath: 
+          path: /sys/fs/bpf
           type: Directory
