@@ -277,7 +277,14 @@ static void serialize_and_send(const struct event_t *e) {{
     if (!f) return;
 
     fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu", event_type_str[e->type], e->pid, e->ts_ns);
-    fprintf(stderr, "debug pathname: %s\\n", e->data.openat.pathname);
+   // fprintf(stderr, "debug pathname: %s\\n", e->data.openat.pathname); 
+                            
+  // 이 라인을 추가하여 NULL 여부를 stderr로 출력
+        if (!e->data.openat.pathname) {{
+            fprintf(stderr, "DEBUG: OPENAT event pathname is NULL in container.\\n");
+        }}                                
+
+
     // Event-specific data
     switch (e->type) {{
 {event_cases}
