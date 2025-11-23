@@ -139,7 +139,7 @@ static void kafka_init() {{
     //환경변수 로드
     const char* kafka_topic = getenv("KAFKA_TOPIC");
     if (!kafka_topic) {{ kafka_topic = "syscall_events"; }}
-    const char *kafka_bootstrap = getenv("KAFKA_BOOTSTRAP_SERVERS");
+    const char *kafka_bootstrap = "192.168.0.8:30719"; //getenv("KAFKA_BOOTSTRAP_SERVERS");
     if (!kafka_bootstrap) {{ kafka_bootstrap = "my-cluster-kafka-bootstrap.kafka.svc:9092"; }}
 
     // rd_kafka_conf_set 설정 객체에 부트스트랩 서버 설정입력
@@ -278,12 +278,7 @@ static void serialize_and_send(const struct event_t *e) {{
 
     fprintf(f, "{{\\"type\\":\\"%s\\",\\"pid\\":%u,\\"ts\\":%llu", event_type_str[e->type], e->pid, e->ts_ns);
    // fprintf(stderr, "debug pathname: %s\\n", e->data.openat.pathname); 
-                            
-  // 이 라인을 추가하여 NULL 여부를 stderr로 출력
-        if (!e->data.openat.pathname) {{
-            fprintf(stderr, "DEBUG: OPENAT event pathname is NULL in container.\\n");
-        }}                                
-
+                        
 
     // Event-specific data
     switch (e->type) {{
