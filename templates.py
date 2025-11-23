@@ -130,7 +130,7 @@ static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void 
     if (rkmessage->err) {{
         fprintf(stderr, " Message delivery failed: %s\\n", rd_kafka_err2str(rkmessage->err));
     }} else{{
-            fprintf(stderr, "전송 성공! [Topic: %s] [Partition: %d] [Offset: %ld] [Len: %zu bytes]\\n",
+            //fprintf(stderr, "전송 성공! [Topic: %s] [Partition: %d] [Offset: %ld] [Len: %zu bytes]\\n",
                 rd_kafka_topic_name(rkmessage->rkt),
                 rkmessage->partition,
                 rkmessage->offset,
@@ -298,6 +298,8 @@ static void serialize_and_send(const struct event_t *e) {{
     //stdout_send(buf, size) 하면 콘솔에 출력 됨, buf에는 정상적인 json 문자열이 들어있음
     //***********KAFKA*************
     //여기 디버깅코드 넣으니까 반복되긴함
+                                  
+    printf("Sending to Kafka: %s\\n", buf);
     kafka_send(buf, size);
     free(buf);
 }}
