@@ -1,107 +1,70 @@
 pipeline {
     agent any
 
-    environment {
-        // 1. Harbor 및 이미지 정보
-        HARBOR_URL       = "shkch.duckdns.org"
-        HARBOR_PROJECT   = "monitor_loader"
-        HARBOR_CREDS_ID  = "harbor-creds"
-        MONITOR_IMAGE_NAME  = "kafka"
-        KUBE_CREDS_ID = "kubeconfig-creds"
-        LOADER_DOCKERFILE = "loader.Dockerfile"
-        IMAGE_NAME = "monitorloader"
-        DAEMONSET_YAML_FILE = "monitorloader-daemonset.yaml"
-
-        // 2. SSH 터널링/K8s 접속 정보를 환경 변수로 이동 (def 제거)
-        K8S_USER = "server4"
-        SSH_HOST = "sangsu02.iptime.org"
-        K8S_TARGET_IP = "192.168.0.10" 
-        K8S_PORT = "6443"
-
-        // DaemonSet YAML 파일 이름 정의 (루트 디렉토리에 있다고 가정)
-        DAEMONSET_YAML = "monitorloader-daemonset.yaml"
-    }
+    // ⚠️ 환경 변수 대신 Groovy 맵을 사용하여 노드별 접속 정보를 정의합니다.
+    def NODE_MAP = [
+        'k8s-worker1': [user: 'server1', dir: '/home/server1/2025-1/generate_bpf'],
+        'k8s-worker2': [user: 'server2', dir: '/home/server2/2025-1/generate_bpf'],
+        'k8s-master':  [user: 'server4', dir: '/home/server4/2025-1/generate_bpf']
+    ]
     
+    // 카프카 정보는 공통 환경 변수로 유지합니다.
+    environment {
+        KAFKA_BOOTSTRAP_SERVERS = "192.168.0.8:30719"
+    }
+
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm } 
         }
 
-        stage('Define Image Tag') {
-            steps {
-                script {
-                    env.IMAGE_TAG = sh(returnStdout: true, script: 'git rev-parse --short=8 HEAD').trim()
-                    echo "Using Image Tag: ${env.IMAGE_TAG}"
-                }
-            }
-        }
-
-        stage('Build & Push Images') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: env.HARBOR_CREDS_ID, usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
-                    sh "docker login ${env.HARBOR_URL} -u ${HARBOR_USER} -p '${HARBOR_PASS}'" 
-                }
-
+        stage('Deploy eBPF Agent via jump host'){
+            steps{
                 script{
-                    def FULL_IMAGE = "${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    // ⚠️ Groovy Map의 키(key)들을 노드 별칭 목록으로 사용합니다.
+                    def nodes_list = NODE_MAP.keySet() 
 
-                    echo "Building monitor_loader Image..."
+                    parallel(
+                        nodes_list.collectEntries{ node_alias ->
+                            ["Deploy to ${node_alias}":{
+                                // 해당 노드의 접속 정보 (user, dir)를 가져옵니다.
+                                def node_info = NODE_MAP.get(node_alias)
+                                def ssh_user = node_info.user
+                                def agent_dir = node_info.dir
+                                def remote_host_alias = "${ssh_user}@${node_alias}" // 예: server1@k8s-worker1
+                                
+                                withCredentials([sshUserPrivateKey(credentialsId: 'your-ssh-credential-id', keyFileVariable: 'KEY_FILE')]){
+                                    def remoteCommands = """
+                                        set -e
+                                        
+                                        echo "Stopping old monitor_loader on ${node_alias} (User: ${ssh_user})..."
+                                        sudo pkill monitor_loader || true 
 
-                    sh "docker build -f ${env.LOADER_DOCKERFILE} -t ${FULL_IMAGE} ."
-                    sh "docker push ${FULL_IMAGE}"
-                }
-            }
-        }
-    
-        // 4단계: Deploy to Kubernetes (Kustomize 제거, sed 적용)
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    def localPort = 8888 
-                    def KUBECONFIG_PATH
-                    def tunnelPid
-                    def FULL_IMAGE_PATH = "${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    // 1. SSH 터널 시작과 인증서 주입
-                    sshagent(['k8s-master-ssh-key']) {
-                        
-                        // SSH 터널 백그라운드에서 실행하고 PID를 파일에 저장
-                        sh "nohup ssh -o StrictHostKeyChecking=no -N -L ${localPort}:${env.K8S_TARGET_IP}:${env.K8S_PORT} ${env.K8S_USER}@${env.SSH_HOST} > /dev/null 2>&1 & echo \$! > tunnel.pid"
-                        
-                        tunnelPid = readFile('tunnel.pid').trim()
-                        sleep 10 // 터널 활성화 대기
+                                        echo "Changing directory to ${agent_dir}..."
+                                        cd ${agent_dir}
+                                        git pull origin main
+                                        
+                                        echo "Building agent..."
+                                        make clean 
+                                        python3 generate_bpf.py -f jsonlist.json
+                                        make
 
-                        // 2. Kubeconfig 임시 수정 및 배포
-                        withCredentials([file(credentialsId: env.KUBE_CREDS_ID, variable: 'KUBECONFIG_FILE')]) {
-                            
-                            sh "sed -i 's|server:.*|server: https://127.0.0.1:${localPort}|g' ${KUBECONFIG_FILE} || true" 
-                            KUBECONFIG_PATH = env.KUBECONFIG_FILE
-                            
-                                                        
-                            sh "sed -i 's|image:.*${env.IMAGE_NAME}:latest|image: ${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}|g' ${DAEMONSET_YAML_FILE}"
+                                        echo "Starting new monitor_loader..."
+                                        # 명령어 실행 시, 에이전트 경로를 사용하여 실행합니다.
+                                        nohup sudo KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS} ./${agent_dir}/monitor_loader > /dev/null 2>&1 &
 
-                            echo "Deploying DaemonSet with image tag: ${env.IMAGE_TAG}"
+                                        echo "Deployment to ${node_alias} completed."
+                                    """
 
-                            // 3. kubectl apply 실행 (수정된 YAML 파일 사용)
-                            sh "KUBECONFIG=${KUBECONFIG_PATH} kubectl apply -f ${env.DAEMONSET_YAML}"
-                            
-                            // 4. 강제 롤아웃 재시작
-                            sh "KUBECONFIG=${KUBECONFIG_PATH} kubectl rollout restart daemonset monitorloader-daemonset -n default "
-                        
-                            // 5. 백그라운드 SSH 터널 프로세스 종료
-                            sh "kill ${tunnelPid} || true" 
-                            sh "rm -f tunnel.pid || true"
+                                    // SSH 접속은 사용자@노드별칭 형태로 실행됩니다.
+                                    // 이 때, ~/.ssh/config 파일에 등록된 별칭(k8s-worker1 등)이 사용되어 점프 호스트를 경유합니다.
+                                    sh "ssh -o StrictHostKeyChecking=no -i ${KEY_FILE} ${remote_host_alias} ${remoteCommands}"
+                                }  
+                            }]  
                         }
-                    }
-                }
+                    )   
+                }       
             }
         }
-    }
-    
-    post {
-        always {
-            sh "docker logout ${env.HARBOR_URL} || true"
-        }
-    }
+    } 
 }

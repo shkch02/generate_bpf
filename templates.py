@@ -139,7 +139,7 @@ static void kafka_init() {{
     //환경변수 로드
     const char* kafka_topic = getenv("KAFKA_TOPIC");
     if (!kafka_topic) {{ kafka_topic = "syscall_events"; }}
-    const char *kafka_bootstrap = "192.168.0.8:30719"; //getenv("KAFKA_BOOTSTRAP_SERVERS");
+    const char *kafka_bootstrap = getenv("KAFKA_BOOTSTRAP_SERVERS"); //"192.168.0.8:30719" //
     if (!kafka_bootstrap) {{ kafka_bootstrap = "my-cluster-kafka-bootstrap.kafka.svc:9092"; }}
 
     // rd_kafka_conf_set 설정 객체에 부트스트랩 서버 설정입력
