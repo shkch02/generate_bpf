@@ -130,11 +130,11 @@ static void dr_msg_cb(rd_kafka_t *rk, const rd_kafka_message_t *rkmessage, void 
     if (rkmessage->err) {{
         fprintf(stderr, " Message delivery failed: %s\\n", rd_kafka_err2str(rkmessage->err));
     }} else{{
-            //fprintf(stderr, "전송 성공! [Topic: %s] [Partition: %d] [Offset: %ld] [Len: %zu bytes]\\n",
+            /*fprintf(stderr, "전송 성공! [Topic: %s] [Partition: %d] [Offset: %ld] [Len: %zu bytes]\\n",
                 rd_kafka_topic_name(rkmessage->rkt),
                 rkmessage->partition,
                 rkmessage->offset,
-                rkmessage->len);
+                rkmessage->len);*/
             }}
 }}
 
