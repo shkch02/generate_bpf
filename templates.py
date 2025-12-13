@@ -142,11 +142,14 @@ static void kafka_init() {{
     const char *kafka_bootstrap = getenv("KAFKA_BOOTSTRAP_SERVERS"); //"192.168.0.8:30719" //
     if (!kafka_bootstrap) {{ kafka_bootstrap = "192.168.0.8:30719"; }}
 
-    // rd_kafka_conf_set 설정 객체에 부트스트랩 서버 설정입력
-    // conf : 설정 객체
-    // "bootstrap.servers" : 설정 키 <- 뭐임?
-    // kafka_bootstrap : 설정 값
-    // errstr, sizeof(errstr) : 오류 발생 시 오류 메시지 저장 버퍼 
+    /* 설정 객체에 부트스트랩 서버 설정입력
+    rd_kafka_conf_set(
+     conf : 설정 객체
+     "bootstrap.servers" : 설정 키 <- 뭐임?
+     kafka_bootstrap : 설정 값
+     errstr, sizeof(errstr) : 오류 발생 시 오류 메시지 저장 버퍼 
+    )
+    */
     if (rd_kafka_conf_set(conf, "bootstrap.servers", kafka_bootstrap, errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {{
         fprintf(stderr, "%s\\n", errstr);
         exit(1);
@@ -178,16 +181,18 @@ static void kafka_send(const char* buffer, size_t len) {{
 
     //여까진 정상적으로 찍히는거확인 ( 아래 주석 풀면 메세지 존나나옴)                            
     //fprintf(stderr,"debug Kafka_send\\n");
-                                  
-    // rd_kafka_produce(
-    // rkt : 토픽 객체 지정
-    // RD_KAFKA_PARTITION_UA : 파티션 자동 할당
-    // RD_KAFKA_MSG_F_COPY : 메시지 데이터를 내부적으로 복사
-    // (void*)buffer : 전송할 메시지 데이터
-    // len : 메시지 길이
-    // NULL, 0 : 키 없음
-    // NULL : 추가 옵션 없음
-    // )
+
+    /* 카프카 메세지 프로듀스              
+    rd_kafka_produce(
+     rkt : 토픽 객체 지정
+     RD_KAFKA_PARTITION_UA : 파티션 자동 할당
+     RD_KAFKA_MSG_F_COPY : 메시지 데이터를 내부적으로 복사
+     (void*)buffer : 전송할 메시지 데이터
+     len : 메시지 길이
+     NULL, 0 : 키 없음
+     NULL : 추가 옵션 없음
+    )
+    */
     rd_kafka_produce(rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, (void*)buffer, len, NULL, 0, NULL);
     // Poll for delivery reports (and other events).
                                   
@@ -198,7 +203,7 @@ static void kafka_send(const char* buffer, size_t len) {{
     //printf("%s\\n", buffer);
 }}
 
-/* [추가] Cgroup 스캔 콜백 함수 (PoC 로직) */
+/* Cgroup 스캔 콜백 함수 */
 static int dir_scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {{
     if (g_map_fds[0] < 0) return -1; // 맵이 준비되지 않음
 
@@ -207,7 +212,7 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
             __u64 cgroup_id = sb->st_ino;
             __u8 value = 1;
 
-            /* [수정] 5개의 맵을 모두 순회하며 업데이트 */
+            // num_syscalls개의 맵을 모두 순회하며 업데이트
             for (int i = 0; i < {num_syscalls}; i++) {{
                 if (g_map_fds[i] < 0) continue; // 유효한 FD인지 확인
                 
@@ -221,14 +226,21 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
     return 0; // 계속 스캔
 }}
                                   
-/* [추가] Cgroup 스캐너 스레드 함수 (PoC 로직) */
+/* Cgroup 스캐너 스레드 함수  */
 void *scanner_thread(void *arg) {{
     if (g_map_fds[0] < 0) {{
         fprintf(stderr, "Scanner thread received invalid map FD\\n");
         return NULL;
     }}
 
-    /* [수정] 기존 'running' 전역 변수를 사용  */
+    /* cgroup아래 파일 트리 순회하면서 파일 발생시 콜백함수 호출하는 nftw호출 
+    nftw(
+     "/sys/fs/cgroup" : 탐색 시작 경로
+     dir_scan_callback : 파일,폴더 찾을때마다 실행하는 콜백함수
+     20: 동시에 열어둘 최대 파일 디스크립터 수
+     FTW_PHYS : 심볼릭 링크 추적 x 명시하는 플래그
+    )                              
+    */                              
     while (running) {{ 
         // printf("Scanning /sys/fs/cgroup...\\n");
 
