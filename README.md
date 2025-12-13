@@ -107,3 +107,7 @@ man 2 파싱 의존성 아예 없어져야함, 최소한의 자료형 처리 로
 
 #### (완료) buf 인자 따옴표로 감싸야함(16진수라)
 주소값 내용 따오려면 엄청난 리팩토링 필요 better die
+
+
+## 참고) 명령어
+#### cgroup 확인 명령어 ```sudo find /sys/fs/cgroup -type d \( -name "*kubepods*" -o -name "*docker-*" \)```
