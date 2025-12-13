@@ -207,7 +207,9 @@ static void kafka_send(const char* buffer, size_t len) {{
 static int dir_scan_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {{
     if (g_map_fds[0] < 0) return -1; // 맵이 준비되지 않음
 
+    //FYW_D인 디렉토리인 경우만 필터링,cgroup은 디렉토리임
     if (typeflag == FTW_D) {{
+        //kubepods와 docker로 시작하는 경로만 필터링, 필요시 containterd등 추가가능
         if (strstr(fpath, "kubepods") || strstr(fpath, "docker-")) {{
             __u64 cgroup_id = sb->st_ino;
             __u8 value = 1;
@@ -216,7 +218,14 @@ static int dir_scan_callback(const char *fpath, const struct stat *sb, int typef
             for (int i = 0; i < {num_syscalls}; i++) {{
                 if (g_map_fds[i] < 0) continue; // 유효한 FD인지 확인
                 
-                // [수정] g_map_fds[i] (배열 요소)를 전달
+                /* bpf맵에 cgroup id(i node)가 추적대상임을 명시
+                bpf_map_update_elem(
+                 g_map_fds[i]: 커널과 공유하는 BPF 맵의 핸들
+                 &cgroup_id: Key (방금 찾은 컨테이너의 ID=i-node)
+                 &value: Value (1)
+                 BPF_ANY: 이미 있으면 덮어쓰고, 없으면 새로 만듦
+                )
+                */
                 if (bpf_map_update_elem(g_map_fds[i], &cgroup_id, &value, BPF_ANY) != 0) {{
                     // fprintf(stderr, "Failed to update map[%d] for cgroup %s (ID: %llu): %s\\n", i, fpath, cgroup_id, strerror(errno));
                 }}
